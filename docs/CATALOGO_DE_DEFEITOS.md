@@ -8,7 +8,14 @@
 
 **Total: 34 defeitos** — 3 P0, 13 P1, 15 P2, 3 P3.
 
-**Situação em 29/08/2026, após a Onda 1:** 5 corrigidos (BUG-001, BUG-003, BUG-010, BUG-011, BUG-029), 1 em correção (BUG-031), 28 abertos.
+**Situação em 29/08/2026, após a Onda 2:** 12 corrigidos, 1 em correção (BUG-031), 21 abertos.
+
+| Onda | Defeitos fechados |
+|---|---|
+| 1 — Destravar | BUG-001, BUG-003, BUG-010, BUG-011, BUG-029 |
+| 2 — Recuperar os dados | BUG-002, BUG-004, BUG-005, BUG-006, BUG-022, BUG-032, e BUG-020 antecipado da Onda 4 |
+
+**Decisão de projeto registrada na Onda 2.** Campo que o OCR não recupera conta como **ausência** (motivo `*_ilegivel`), não como invalidez. Os 25 registros digitalizados entram como incompletos: o e-mail e o nome do solicitante não estão legíveis na imagem de 150 DPI, e nenhuma configuração de OCR testada os recupera. Nada é reconstruído por inferência.
 
 ---
 
@@ -131,7 +138,7 @@ Note o contraste: `configure_logging` chama `mkdir(parents=True, exist_ok=True)`
 |---|---|
 | **Prioridade** | P0 |
 | **Local** | `src/ocr_processor.py`; `src/pipeline.py:45-48`; `src/main.py:13` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 2, commit f43c4ae |
 
 **Descrição.** As 7 páginas de `atendimentos_digitalizados.pdf` — protocolos AT-051 a AT-075 — falham no OCR. As falhas são gravadas em `erros_processamento`, o processo continua e termina com **código de saída zero** e a mensagem `Registros encontrados: 75`. Nada no resumo indica que um documento inteiro ficou de fora.
 
@@ -197,7 +204,7 @@ Ver `BUG-032`: corrigir este defeito isoladamente **não** recupera os 25 regist
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/validation.py:44-62` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 2, commit 670f818 |
 
 **Descrição.** Os PDFs marcam campos ausentes com o literal `[vazio]`. A validação testa apenas string vazia (`if not r.get(required,"").strip()`), e `"[vazio]"` é não vazia — logo passa como campo preenchido.
 
@@ -226,7 +233,7 @@ AT-081 | [vazio] | rafael.batista@aluno.exemplo.br | 26.0 | 78550-000 | valido |
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/validation.py:55-62` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 2, commit 670f818 |
 
 **Descrição.** Zero registros classificados como `incompleto` em 75 processados, embora `atendimentos_incompletos.pdf` exista justamente para exercitar essa classe. O sistema entrega três das quatro classificações exigidas.
 
@@ -268,7 +275,7 @@ Um registro simultaneamente inválido **e** incompleto é rotulado `incompleto`,
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/pipeline.py:51-52` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 2, commit 670f818 |
 
 **Descrição.** Dois registros distintos trazem `PROTOCOLO?` no campo de protocolo. Ambos recebem a mesma chave; o segundo é classificado **duplicado** em vez de **inválido**.
 
@@ -570,7 +577,7 @@ Registros encontrados: 0
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/validation.py:9-14` (`FIELD_PATTERNS`); `src/ocr_processor.py` |
-| **Status** | Aberto — **constatado por inspeção da imagem, a confirmar com o Tesseract instalado** |
+| **Status** | Corrigido — Onda 2, commit 0bb849b |
 
 **Descrição.** `atendimentos_digitalizados.pdf` usa um **layout diferente dos demais**: tabela de duas colunas com rótulo e valor lado a lado, e não a lista vertical dos outros arquivos. Além disso, a renderização da digitalização insere espaços dentro das palavras — visível na imagem original como `E-m ail`, `Tem po`, `Program ador de Sistem as`.
 
@@ -653,7 +660,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-020"></a>
 ## BUG-020 — Acentuação corrompida no console do Windows
 
-**Prioridade** P2 · **Local** `src/pipeline.py:18-20` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:18-20` · **Status** Corrigido — antecipado para a Onda 2, commit f43c4ae
 
 **Descrição.** `logging.StreamHandler()` é criado sem `encoding`. No console do Windows os acentos são corrompidos: `Documento j? processado; ignorando: ...`. O arquivo `.log` sai correto em UTF-8 — o defeito é só no terminal, que é justamente onde o operador acompanha a execução.
 
@@ -681,7 +688,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-022"></a>
 ## BUG-022 — `Documento.metodo` grava um metadado falso
 
-**Prioridade** P2 · **Local** `src/pipeline.py:41-42` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:41-42` · **Status** Corrigido — Onda 2, commit 670f818
 
 **Descrição.** `atendimentos_digitalizados.pdf` está gravado com `metodo = "ocr"` embora as 7 páginas tenham falhado e nenhum texto tenha sido extraído. O método é derivado da *intenção* de processar, avaliada antes da execução, não do resultado.
 

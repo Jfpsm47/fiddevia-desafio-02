@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sys
 from hashlib import sha256
 from pathlib import Path
 
@@ -16,19 +17,39 @@ from .analytics import export_results, generate_charts
 from .config import resolve, resolve_sqlite_url
 from .database import create_session_factory, find_by_protocol, session_scope
 from .models import Atendimento, Chunk, Documento, ErroProcessamento
-from .ocr_processor import ocr_page
+from .ocr_processor import imagem_da_pagina, verificar_ocr
+from .ocr_table import extrair_registros
 from .pdf_processor import extract_pdf_pages
 from .text_processor import metadata_json, preprocess, split_chunks
-from .validation import clean_text, extract_fields, validate_record
+from .validation import PROTO_RE, clean_text, extract_fields, validate_record
+
+
+def console_utf8(stream):
+    """Reconfigura um fluxo do console para UTF-8, no próprio objeto.
+
+    Sem isso, o console do Windows corrompe os acentos das mensagens
+    ("Documento j? processado"), enquanto o arquivo de log sai correto
+    (BUG-020). A reconfiguração é feita no lugar de propósito: encapsular o
+    fluxo em um TextIOWrapper novo faria o buffer original ser fechado quando
+    o invólucro fosse coletado, derrubando a saída do processo.
+    """
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
+    return stream
 
 
 def configure_logging(path: Path) -> None:
-    """Configura o log em arquivo (UTF-8) e no console."""
+    """Configura o log em arquivo (UTF-8) e no console, ambos em UTF-8."""
     path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[logging.FileHandler(path, encoding="utf-8"), logging.StreamHandler()],
+        handlers=[
+            logging.FileHandler(path, encoding="utf-8"),
+            logging.StreamHandler(console_utf8(sys.stderr)),
+        ],
     )
 
 
@@ -60,6 +81,11 @@ def process_all(cfg: dict) -> pd.DataFrame:
     factory = create_session_factory(resolve_sqlite_url(root, cfg["banco"]["url"]))
     pdf_dir = resolve(root, cfg["entrada"]["diretorio_pdfs"])
 
+    # Verifica o OCR uma vez, antes de processar, em vez de descobrir a falha
+    # página a página no meio do trabalho (BUG-002).
+    ocr_ok, ocr_msg = verificar_ocr(cfg["ocr"].get("tesseract_cmd") or None, cfg["ocr"]["idioma"])
+    logging.info("OCR: %s", ocr_msg) if ocr_ok else logging.warning("OCR indisponível — %s", ocr_msg)
+
     rows: list[dict] = []
     for pdf in sorted(pdf_dir.glob(cfg["entrada"]["padrao"])):
         marca = len(rows)
@@ -85,6 +111,34 @@ def process_all(cfg: dict) -> pd.DataFrame:
     return df
 
 
+def documentos_sem_registros(cfg: dict) -> list[str]:
+    """Lista os documentos que não produziram nenhum atendimento.
+
+    É o sinal que faltava: a entrega perdia um PDF inteiro e ainda assim
+    encerrava anunciando sucesso (BUG-002).
+    """
+    root = Path(cfg["_root"])
+    factory = create_session_factory(resolve_sqlite_url(root, cfg["banco"]["url"]))
+    with session_scope(factory) as session:
+        documentos = session.scalars(select(Documento)).all()
+        vazios = []
+        for d in documentos:
+            tem_atendimento = session.scalar(
+                select(Atendimento).where(Atendimento.documento_id == d.id).limit(1)
+            )
+            # Um documento só de duplicatas não é perda: os registros foram
+            # lidos e conscientemente não reinseridos.
+            tem_duplicata = session.scalar(
+                select(ErroProcessamento)
+                .where(ErroProcessamento.documento_id == d.id)
+                .where(ErroProcessamento.etapa == "deduplicacao")
+                .limit(1)
+            )
+            if not tem_atendimento and not tem_duplicata:
+                vazios.append(d.nome_arquivo)
+    return vazios
+
+
 def _process_document(
     session: Session,
     pdf: Path,
@@ -99,21 +153,19 @@ def _process_document(
         return
 
     page_data = extract_pdf_pages(pdf, cfg["ocr"]["min_caracteres_extracao_direta"])
-    method = "ocr" if all(p["metodo"] == "ocr_pendente" for p in page_data) else "extracao_direta"
     doc = Documento(
         nome_arquivo=pdf.name,
         hash_sha256=digest,
         total_paginas=len(page_data),
-        metodo=method,
+        metodo="pendente",
     )
     session.add(doc)
     session.flush()
 
     for page in page_data:
-        text = page["texto"]
         if page["metodo"] == "ocr_pendente":
             try:
-                text = ocr_page(pdf, page["pagina"], cfg["ocr"]["dpi"], cfg["ocr"]["idioma"])
+                extraidos = _registros_por_ocr(pdf, page, cfg, categories)
                 page["metodo"] = "ocr"
             except Exception as exc:
                 session.add(
@@ -127,8 +179,44 @@ def _process_document(
                 )
                 logging.exception("OCR falhou: %s p.%s", pdf.name, page["pagina"])
                 continue
-        for raw in split_records(text):
-            _persist_record(session, doc, pdf, page, raw, cfg, categories, rows)
+        else:
+            extraidos = [
+                {"campos": extract_fields(raw), "ilegiveis": set(), "texto": raw}
+                for raw in split_records(page["texto"])
+            ]
+        for registro in extraidos:
+            _persist_record(session, doc, pdf, page, registro, cfg, categories, rows)
+
+    # O método do documento reflete o que de fato aconteceu, não a intenção
+    # avaliada antes de processar (BUG-022).
+    doc.metodo = _metodo_do_documento(page_data)
+    session.flush()
+
+
+def _metodo_do_documento(page_data: list[dict]) -> str:
+    """Resume, em uma palavra, como as páginas de um documento foram lidas."""
+    metodos = {p["metodo"] for p in page_data}
+    if metodos == {"ocr_pendente"}:
+        return "falhou"
+    processados = metodos - {"ocr_pendente"}
+    if len(processados) == 1 and not metodos & {"ocr_pendente"}:
+        return processados.pop()
+    return "misto"
+
+
+def _registros_por_ocr(pdf: Path, page: dict, cfg: dict, categories: dict) -> list[dict]:
+    """Lê uma página digitalizada célula a célula.
+
+    A extração por texto corrido não funciona nesses documentos: o OCR corrompe
+    os próprios rótulos e nenhum padrão casa (BUG-032).
+    """
+    from .ocr_processor import configurar_tesseract
+
+    configurar_tesseract(cfg["ocr"].get("tesseract_cmd") or None)
+    imagem = imagem_da_pagina(pdf, page["pagina"], cfg["ocr"]["dpi"])
+    if imagem is None:
+        return []
+    return extrair_registros(imagem, categories)
 
 
 def _persist_record(
@@ -136,7 +224,7 @@ def _persist_record(
     doc: Documento,
     pdf: Path,
     page: dict,
-    raw: str,
+    registro: dict,
     cfg: dict,
     categories: dict,
     rows: list[dict],
@@ -146,10 +234,18 @@ def _persist_record(
     Uma falha de integridade afeta apenas este registro: ela é anotada em
     ``erros_processamento`` e o processamento segue para o próximo.
     """
-    fields = extract_fields(raw)
-    classification, reasons, normalized = validate_record(fields, categories)
-    fallback = "INVALIDO-{0}-{1}-{2}".format(doc.id, page["pagina"], len(rows) + 1)
-    protocol = normalized.get("protocolo") or fallback
+    fields = registro["campos"]
+    ilegiveis = registro["ilegiveis"]
+    raw = registro["texto"]
+    classification, reasons, normalized = validate_record(fields, categories, ilegiveis)
+    lido = normalized.get("protocolo") or ""
+    # A entrega usava `lido or fallback`: como "PROTOCOLO?" é verdadeiro em
+    # contexto booleano, o fallback nunca disparava e dois registros ilegíveis
+    # colidiam na mesma chave, virando falsa duplicata (BUG-006).
+    if PROTO_RE.fullmatch(lido):
+        protocol = lido
+    else:
+        protocol = "SEM-PROTOCOLO-{0}-{1}-{2}".format(doc.id, page["pagina"], len(rows) + 1)
     if find_by_protocol(session, protocol):
         classification = "duplicado"
         reasons.append("protocolo_duplicado")
@@ -157,6 +253,7 @@ def _persist_record(
     row = {
         **fields,
         "protocolo": protocol,
+        "protocolo_bruto": lido,
         "categoria": normalized.get("categoria_normalizada") or fields.get("categoria"),
         "data": normalized.get("data_obj"),
         "tempo_minutos": normalized.get("tempo_obj"),
