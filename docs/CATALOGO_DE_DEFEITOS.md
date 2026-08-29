@@ -8,12 +8,13 @@
 
 **Total: 34 defeitos** — 3 P0, 13 P1, 15 P2, 3 P3.
 
-**Situação em 29/08/2026, após a Onda 2:** 12 corrigidos, 1 em correção (BUG-031), 21 abertos.
+**Situação em 29/08/2026, após a Onda 3:** 20 corrigidos, 1 em correção (BUG-031), 13 abertos.
 
 | Onda | Defeitos fechados |
 |---|---|
 | 1 — Destravar | BUG-001, BUG-003, BUG-010, BUG-011, BUG-029 |
 | 2 — Recuperar os dados | BUG-002, BUG-004, BUG-005, BUG-006, BUG-022, BUG-032, e BUG-020 antecipado da Onda 4 |
+| 3 — Completar os indicadores | BUG-007, BUG-008, BUG-009, BUG-014, BUG-016, BUG-017, BUG-018, BUG-025 |
 
 **Decisão de projeto registrada na Onda 2.** Campo que o OCR não recupera conta como **ausência** (motivo `*_ilegivel`), não como invalidez. Os 25 registros digitalizados entram como incompletos: o e-mail e o nome do solicitante não estão legíveis na imagem de 150 DPI, e nenhuma configuração de OCR testada os recupera. Nada é reconstruído por inferência.
 
@@ -311,7 +312,7 @@ Como `normalized["protocolo"]` vale `"PROTOCOLO?"` — verdadeiro em contexto bo
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/cep_client.py` (não referenciado); `src/pipeline.py:57` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 3, commit d0d1631 |
 
 **Descrição.** `cep_client.lookup_cep` está implementado, é tolerante a falhas e **nenhum outro módulo o importa**. O pipeline grava literalmente `municipio=None, uf=None` na criação de cada `Atendimento`.
 
@@ -343,7 +344,7 @@ As colunas `municipio` e `uf` também não aparecem no CSV exportado.
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/analytics.py:9-20` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 3, commit 19b0470 |
 
 **Descrição.** `indicadores.json` traz 8 chaves. Confrontando com a Seção 8 do enunciado, faltam:
 
@@ -376,7 +377,7 @@ As colunas `municipio` e `uf` também não aparecem no CSV exportado.
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/analytics.py:19` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 3, commit 19b0470 |
 
 **Descrição.** O enunciado pede o percentual de **páginas** processadas por OCR. O cálculo é `(df["metodo"] == "ocr").mean() * 100` — a proporção de **registros**. Valor esperado: 7/27 = 25,93%; valor obtido: 0,0%.
 
@@ -519,7 +520,7 @@ Os 5,5 s se repetem em todas as requisições subsequentes, sem que nada mude en
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/pipeline.py:62-65`; `src/main.py:13` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 3, commit 19b0470 |
 
 **Descrição.** Na segunda execução os quatro documentos são corretamente ignorados pelo hash, mas o `DataFrame` sai vazio, `export_results` e `generate_charts` **não são chamados**, e o operador fica com CSV, indicadores e gráficos da execução anterior sem nenhum aviso.
 
@@ -602,7 +603,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-016"></a>
 ## BUG-016 — Duplicados contaminam os indicadores
 
-**Prioridade** P2 · **Local** `src/pipeline.py:53-56`, `src/analytics.py:9-20` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:53-56`, `src/analytics.py:9-20` · **Status** Corrigido — Onda 3, commit 19b0470
 
 **Descrição.** Os 11 registros duplicados entram no `DataFrame` e são contados em `por_categoria`, `por_status` e nas estatísticas de tempo, junto dos 13 inválidos. `tempo_medio = 50,83` é calculado sobre uma base que inclui registros que o próprio sistema rejeitou.
 
@@ -617,7 +618,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-017"></a>
 ## BUG-017 — Categorias não oficiais vazam para indicadores e gráficos
 
-**Prioridade** P2 · **Local** `src/pipeline.py:53`, `src/analytics.py:31-34` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:53`, `src/analytics.py:31-34` · **Status** Corrigido — Onda 3, commit 19b0470
 
 **Descrição.** A linha do `DataFrame` grava `categoria_normalizada or categoria_bruta`. Quando a normalização falha, o valor bruto entra no lugar da categoria oficial. Resultado: `"categoria desconhecida"` aparece no `indicadores.json` e é plotada no gráfico oficial ao lado das sete categorias válidas.
 
@@ -632,7 +633,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-018"></a>
 ## BUG-018 — Desvio-padrão populacional onde se espera o amostral
 
-**Prioridade** P2 · **Local** `src/analytics.py:18` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/analytics.py:18` · **Status** Corrigido — Onda 3, commit 19b0470
 
 **Descrição.** `np.std(times)` sem `ddof` devolve o desvio populacional. Para uma amostra de atendimentos, espera-se `ddof=1`.
 
@@ -733,7 +734,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-025"></a>
 ## BUG-025 — `observacoes` é extraído mas não chega ao banco
 
-**Prioridade** P2 · **Local** `src/models.py:20-43`, `src/pipeline.py:57` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/models.py:20-43`, `src/pipeline.py:57` · **Status** Corrigido — Onda 3, commit d0d1631
 
 **Descrição.** `FIELD_PATTERNS` extrai `observacoes`, o campo é exportado no CSV, e o modelo `Atendimento` não tem coluna correspondente. A informação existe no arquivo de saída e não na base.
 

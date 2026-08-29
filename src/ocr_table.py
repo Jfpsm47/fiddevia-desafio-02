@@ -31,7 +31,10 @@ PASSADAS_PROTOCOLO = (
     {"escala": 4, "resample": "BICUBIC"},
 )
 
-LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzÁÂÃÀÉÊÍÓÔÕÚÇáâãàéêíóôõúç "
+#: Só ASCII, de propósito: incluir letras acentuadas na lista de caracteres do
+#: Tesseract degrada o reconhecimento dos dígitos vizinhos — o CEP 78205-160
+#: chegava a sair como 7825-169.
+LETRAS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
 
 #: Lista de caracteres por campo: restringir o alfabeto reduz muito o erro.
 WHITELIST = {
@@ -41,7 +44,9 @@ WHITELIST = {
     "email": "abcdefghijklmnopqrstuvwxyz0123456789.@-_",
     "categoria": LETRAS,
     "status": LETRAS,
-    "cep": "0123456789-/ " + LETRAS,
+    # A célula "CEP / cidade" é lida sem restrição: qualquer lista de
+    # caracteres elimina os espaços que separam o município da UF.
+    "cep": None,
     "tempo_minutos": "0123456789- minvazio[]",
 }
 
@@ -144,7 +149,7 @@ def detectar_grade(imagem) -> tuple[list[list[int]], list[int]]:
     return registros, [x for x, _ in agrupados]
 
 
-def ler_celula(imagem, caixa, whitelist: str, escala: int = 4, resample: str = "LANCZOS") -> str:
+def ler_celula(imagem, caixa, whitelist: str | None, escala: int = 4, resample: str = "LANCZOS") -> str:
     """Executa OCR em uma célula, com o alfabeto restrito ao tipo do campo."""
     import pytesseract
     from PIL import Image
@@ -155,7 +160,9 @@ def ler_celula(imagem, caixa, whitelist: str, escala: int = 4, resample: str = "
     recorte = imagem.crop((x0 + 3, y0 + 3, x1 - 3, y1 - 3))
     filtro = getattr(Image, resample, Image.LANCZOS)
     recorte = recorte.resize((recorte.width * escala, recorte.height * escala), filtro)
-    config = f"--psm 7 -c tessedit_char_whitelist={whitelist}"
+    config = "--psm 7"
+    if whitelist:
+        config += f" -c tessedit_char_whitelist={whitelist}"
     texto = pytesseract.image_to_string(recorte, lang="por", config=config)
     return re.sub(r"\s+", " ", texto).strip()
 
@@ -219,6 +226,55 @@ def normalizar_cep(valor: str) -> str:
     return f"{achado.group(1)}-{achado.group(2)}" if achado else valor.strip()
 
 
+def separar_municipio_uf(valor: str) -> tuple[str, str]:
+    """Separa município e UF de um texto como ``Sinop/MT`` ou ``CaceresM T``.
+
+    A UF é recuperável mesmo em leitura degradada — são as duas últimas letras.
+    O município só é aproveitado quando sobrevive à digitalização com estrutura
+    reconhecível; caso contrário volta vazio, para ser marcado como ilegível.
+
+    Returns:
+        O par ``(municipio, uf)``, com strings vazias no que não foi recuperado.
+    """
+    texto = valor.strip().strip("-").strip()
+    if not texto:
+        return "", ""
+    if "/" in texto:
+        municipio, _, uf = texto.rpartition("/")
+        return municipio.strip(), re.sub(r"[^A-Za-z]", "", uf).upper()[:2]
+
+    letras = re.sub(r"[^A-Za-z]", "", texto)
+    uf = letras[-2:].upper() if len(letras) >= 2 else ""
+    # remove as duas últimas letras de trás para frente, preservando o resto
+    restante, removidas = [], 0
+    for caractere in reversed(texto):
+        if caractere.isalpha() and removidas < 2:
+            removidas += 1
+            continue
+        restante.append(caractere)
+    municipio = re.sub(r"\s+", " ", "".join(reversed(restante))).strip()
+    return municipio, uf
+
+
+def municipio_plausivel(valor: str) -> bool:
+    """Diz se o município lido sobreviveu à digitalização com estrutura sadia.
+
+    Rejeita as duas marcas típicas da degradação: vocábulos de uma letra, que
+    denunciam um espaço inserido no meio da palavra ("Varzea G rande"), e
+    maiúscula no miolo de um vocábulo ("CuiBba"). Um município assim é ruído
+    com aparência de dado.
+    """
+    limpo = re.sub(r"[^A-Za-z ]", "", valor).strip()
+    if len(limpo.replace(" ", "")) < 4:
+        return False
+    for vocabulo in limpo.split():
+        if len(vocabulo) < 2:
+            return False
+        if any(letra.isupper() for letra in vocabulo[1:]):
+            return False
+    return True
+
+
 def normalizar_tempo(valor: str) -> str:
     """Extrai os minutos de células como ``53mh`` ou ``60mn``."""
     achado = re.search(r"(-?\d+)", valor)
@@ -276,7 +332,17 @@ def extrair_registros(imagem, categorias: dict) -> list[dict[str, Any]]:
             campos[campo] = bruto
 
         campos["data"] = normalizar_data(campos.get("data", ""))
-        campos["cep"] = normalizar_cep(campos.get("cep", ""))
+        celula_cep = campos.get("cep", "")
+        campos["cep"] = normalizar_cep(celula_cep)
+        resto = celula_cep.replace(campos["cep"], "", 1) if campos["cep"] in celula_cep else celula_cep
+        municipio, uf = separar_municipio_uf(resto)
+        campos["uf"] = uf
+        if municipio and municipio_plausivel(municipio):
+            campos["municipio"] = municipio
+        else:
+            campos["municipio"] = ""
+            if resto.strip(" -"):
+                ilegiveis.add("municipio")
         campos["tempo_minutos"] = normalizar_tempo(campos.get("tempo_minutos", ""))
 
         categoria = semelhante(campos.get("categoria", ""), nomes_categoria)

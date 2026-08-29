@@ -6,7 +6,7 @@ import sys
 
 from .config import load_config
 from .indexer import build_index, semantic_query
-from .pipeline import console_utf8, documentos_sem_registros, process_all
+from .pipeline import console_utf8, descartar_base, documentos_sem_registros, process_all
 from .rag import answer
 
 
@@ -22,11 +22,19 @@ def main() -> int:
     parser.add_argument("--indexar", action="store_true", help="indexa os chunks no ChromaDB")
     parser.add_argument("--pergunta", help="consulta em linguagem natural")
     parser.add_argument("--top-k", type=int, default=5, help="quantidade de fontes na resposta")
+    parser.add_argument(
+        "--recriar",
+        action="store_true",
+        help="descarta banco e coleção vetorial antes de processar",
+    )
     args = parser.parse_args()
 
     sys.stdout = console_utf8(sys.stdout)
     sys.stderr = console_utf8(sys.stderr)
     cfg = load_config()
+    if args.recriar:
+        for removido in descartar_base(cfg):
+            print(f"Removido: {removido}")
     df = process_all(cfg)
     print(f"Registros encontrados: {len(df)}")
 
