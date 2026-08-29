@@ -36,6 +36,7 @@ class Atendimento(Base):
     cep: Mapped[str | None] = mapped_column(String(10), nullable=True)
     municipio: Mapped[str | None] = mapped_column(String(100), nullable=True)
     uf: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    metodo: Mapped[str | None] = mapped_column(String(30), nullable=True)
     classificacao: Mapped[str] = mapped_column(String(30), default="valido")
     motivos: Mapped[str | None] = mapped_column(Text, nullable=True)
     texto_original: Mapped[str] = mapped_column(Text)

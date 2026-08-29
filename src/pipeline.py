@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pandas as pd
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -108,10 +109,130 @@ def process_all(cfg: dict) -> pd.DataFrame:
             _register_document_failure(factory, pdf, exc)
 
     df = pd.DataFrame(rows)
+    if df.empty:
+        # Nenhum documento novo: o relatório é reconstruído a partir do banco,
+        # em vez de deixar CSV, indicadores e gráficos desatualizados sem aviso
+        # e anunciar "0 registros" (BUG-014).
+        df = _relatorio_do_banco(factory)
+        if not df.empty:
+            logging.info(
+                "Nenhum documento novo. Relatório reconstruído com %s registros já em base.",
+                len(df),
+            )
     if not df.empty:
-        export_results(df, output, cfg["saida"]["csv"], cfg["saida"]["indicadores"])
+        contexto = _contexto_dos_indicadores(factory)
+        export_results(df, output, cfg["saida"]["csv"], cfg["saida"]["indicadores"], **contexto)
         generate_charts(df, resolve(root, cfg["saida"]["graficos"]))
     return df
+
+
+def _contexto_dos_indicadores(factory: sessionmaker) -> dict:
+    """Reúne, do banco, os totais que o DataFrame de registros não carrega."""
+    with session_scope(factory) as session:
+        documentos = session.scalars(select(Documento)).all()
+        erros = [
+            {"etapa": e.etapa, "tipo": e.tipo}
+            for e in session.scalars(select(ErroProcessamento)).all()
+        ]
+        # Uma página conta uma vez por método, independentemente de quantos
+        # registros produziu — o enunciado pede o percentual de páginas. Um
+        # documento cujos registros eram todos duplicatas não deixa
+        # atendimentos, mas suas páginas foram lidas: por isso a contagem parte
+        # do método do documento, e só recorre à leitura por página quando ele
+        # é misto.
+        paginas_por_metodo: dict[str, int] = {}
+        for documento in documentos:
+            if documento.metodo != "misto":
+                paginas_por_metodo[documento.metodo] = (
+                    paginas_por_metodo.get(documento.metodo, 0) + documento.total_paginas
+                )
+                continue
+            vistas = dict(
+                session.execute(
+                    select(Atendimento.pagina, Atendimento.metodo)
+                    .where(Atendimento.documento_id == documento.id)
+                    .distinct()
+                ).all()
+            )
+            for metodo in vistas.values():
+                paginas_por_metodo[metodo] = paginas_por_metodo.get(metodo, 0) + 1
+            restantes = documento.total_paginas - len(vistas)
+            if restantes > 0:
+                paginas_por_metodo["sem_registro"] = (
+                    paginas_por_metodo.get("sem_registro", 0) + restantes
+                )
+        return {
+            "total_documentos": len(documentos),
+            "total_paginas": sum(d.total_paginas for d in documentos),
+            "paginas_por_metodo": paginas_por_metodo,
+            "erros": erros,
+        }
+
+
+def _relatorio_do_banco(factory: sessionmaker) -> pd.DataFrame:
+    """Reconstrói o relatório a partir dos registros já persistidos.
+
+    Duplicatas não são reinseridas, por decisão de projeto: elas voltam a
+    partir das ocorrências gravadas na etapa de deduplicação.
+    """
+    with session_scope(factory) as session:
+        registros_documento = {d.id: d for d in session.scalars(select(Documento)).all()}
+        documentos = {i: d.nome_arquivo for i, d in registros_documento.items()}
+        linhas = [
+            {
+                "protocolo": a.protocolo, "data": a.data, "solicitante": a.solicitante,
+                "email": a.email, "categoria": a.categoria, "status": a.status,
+                "cep": a.cep, "municipio": a.municipio, "uf": a.uf,
+                "tempo_minutos": a.tempo_minutos, "descricao": a.descricao,
+                "solucao": a.solucao, "observacoes": a.observacoes,
+                "classificacao": a.classificacao, "motivos": a.motivos,
+                "documento": documentos.get(a.documento_id), "pagina": a.pagina,
+                "metodo": a.metodo,
+            }
+            for a in session.scalars(select(Atendimento)).all()
+        ]
+        linhas.extend(
+            {
+                "protocolo": e.mensagem, "classificacao": "duplicado",
+                "motivos": "protocolo_duplicado",
+                "documento": documentos.get(e.documento_id), "pagina": e.pagina,
+                # A duplicata não é persistida, mas sua página foi lida: o
+                # método vem do documento, para o relatório fechar.
+                "metodo": getattr(registros_documento.get(e.documento_id), "metodo", None),
+            }
+            for e in session.scalars(
+                select(ErroProcessamento).where(ErroProcessamento.etapa == "deduplicacao")
+            ).all()
+        )
+    return pd.DataFrame(linhas)
+
+
+def descartar_base(cfg: dict) -> list[str]:
+    """Remove banco e coleção vetorial, para um reprocessamento do zero.
+
+    Sem isso, reprocessar exigia apagar ``database/`` à mão: os documentos já
+    vistos eram ignorados pelo hash e não havia como recriar a base de forma
+    previsível (BUG-014, RF06).
+
+    Returns:
+        Os caminhos efetivamente removidos.
+    """
+    import shutil
+
+    root = Path(cfg["_root"])
+    url = resolve_sqlite_url(root, cfg["banco"]["url"])
+    removidos = []
+
+    banco = make_url(url).database
+    if banco and banco != ":memory:" and Path(banco).exists():
+        Path(banco).unlink()
+        removidos.append(banco)
+
+    chroma = resolve(root, cfg.get("chromadb", {}).get("diretorio", "database/chroma"))
+    if chroma.is_dir():
+        shutil.rmtree(chroma)
+        removidos.append(str(chroma))
+    return removidos
 
 
 def documentos_sem_registros(cfg: dict) -> list[str]:
@@ -343,7 +464,10 @@ def _persist_record(
         "protocolo_bruto": lido,
         "municipio": municipio,
         "uf": uf,
-        "categoria": normalized.get("categoria_normalizada") or fields.get("categoria"),
+        # A categoria oficial pode ser nula: misturá-la ao valor bruto fazia
+        # "categoria desconhecida" ser plotada junto das oficiais (BUG-017).
+        "categoria": normalized.get("categoria_normalizada"),
+        "categoria_bruta": fields.get("categoria"),
         "data": normalized.get("data_obj"),
         "tempo_minutos": normalized.get("tempo_obj"),
         "classificacao": classification,
@@ -376,6 +500,7 @@ def _persist_record(
                 solicitante=fields.get("solicitante"),
                 email=fields.get("email"),
                 categoria=row["categoria"],
+                metodo=page["metodo"],
                 descricao=fields.get("descricao"),
                 solucao=fields.get("solucao"),
                 tempo_minutos=normalized.get("tempo_obj"),
