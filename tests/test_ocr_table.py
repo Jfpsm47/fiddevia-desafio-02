@@ -11,8 +11,8 @@ from PIL import Image, ImageDraw  # noqa: E402
 
 from src.ocr_table import (  # noqa: E402
     BORDAS_ESPERADAS,
-    nome_plausivel,
     detectar_grade,
+    nome_plausivel,
     normalizar_cep,
     normalizar_data,
     normalizar_tempo,
@@ -56,8 +56,10 @@ def test_grade_encontra_todos_os_registros(quantidade):
 
 
 def test_grade_de_pagina_esparsa_nao_ganha_coluna_extra():
-    """Uma página com um só registro produzia um pico espúrio que desalinhava
-    as faixas e fazia os campos da coluna direita serem lidos do rótulo."""
+    """Uma página com um só registro produzia um pico espúrio que desalinhava as faixas e fazia os.
+
+    campos da coluna direita serem lidos do rótulo.
+    """
     imagem = formulario_sintetico(1)
     desenho = ImageDraw.Draw(imagem)
     # texto alinhado em uma coluna qualquer, como acontece na página real
@@ -104,7 +106,9 @@ def test_normalizar_cep(lido, esperado):
     assert normalizar_cep(lido) == esperado
 
 
-@pytest.mark.parametrize("lido,esperado", [("53mh", "53"), ("60mn", "60"), ("-15 min", "-15"), ("", "")])
+@pytest.mark.parametrize(
+    "lido,esperado", [("53mh", "53"), ("60mn", "60"), ("-15 min", "-15"), ("", "")]
+)
 def test_normalizar_tempo(lido, esperado):
     assert normalizar_tempo(lido) == esperado
 
@@ -116,7 +120,8 @@ def test_valor_degradado_encontra_o_oficial():
     assert semelhante("sofware", ["atividade", "software"]) == "software"
     assert semelhante("Concliio", ["Concluido", "Pendente", "Em atendimento"]) == "Concluido"
     assert semelhante("Conclixo", ["Concluido", "Pendente", "Em atendimento"]) == "Concluido"
-    assert semelhante("Ematendmento", ["Concluido", "Pendente", "Em atendimento"]) == "Em atendimento"
+    status = ["Concluido", "Pendente", "Em atendimento"]
+    assert semelhante("Ematendmento", status) == "Em atendimento"
 
 
 @pytest.mark.parametrize(
@@ -160,8 +165,10 @@ def test_grade_do_documento_oficial_acha_os_25_registros():
 
 @pytestmark_ocr
 def test_protocolo_so_e_aceito_quando_as_passadas_concordam():
-    """Um protocolo errado vira a identidade do registro: sem unanimidade entre
-    as passadas de OCR, ele é declarado ilegível em vez de arriscado."""
+    """Um protocolo errado vira a identidade do registro: sem unanimidade entre as passadas de OCR,.
+
+    ele é declarado ilegível em vez de arriscado.
+    """
     pytest.importorskip("pytesseract")
     from src.ocr_processor import imagem_da_pagina, verificar_ocr
     from src.ocr_table import extrair_registros

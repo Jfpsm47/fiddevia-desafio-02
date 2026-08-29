@@ -13,8 +13,10 @@ def fonte(protocolo: str, similaridade: float, conteudo: str = "Erro ao instalar
 
 
 def test_resposta_local_usa_os_trechos_recuperados():
-    """A entrega devolvia sempre o mesmo texto fixo, qualquer que fosse a
-    recuperação: o modo sem chave nunca respondia (BUG-034)."""
+    """A entrega devolvia sempre o mesmo texto fixo, qualquer que fosse a recuperação: o modo sem.
+
+    chave nunca respondia (BUG-034).
+    """
     resultado = local_answer("Como instalar o pip?", [fonte("AT-003", 0.71)])
 
     assert resultado["sustentada"] is True

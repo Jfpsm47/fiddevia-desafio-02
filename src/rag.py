@@ -29,7 +29,7 @@ def montar_contexto(sources: list[dict], limite: int = LIMITE_CONTEXTO) -> str:
     partes: list[str] = []
     usado = 0
     for fonte in sources:
-        trecho = "[Fonte {0} p.{1}] {2}".format(
+        trecho = "[Fonte {} p.{}] {}".format(
             fonte.get("protocolo"), fonte.get("pagina"), fonte.get("conteudo", "")
         )
         if usado + len(trecho) > limite:
@@ -73,7 +73,7 @@ def local_answer(question: str, sources: list[dict]) -> dict:
         if len(conteudo) > 400:
             conteudo = conteudo[:400].rsplit(" ", 1)[0] + "…"
         linhas.append(
-            "- {0} ({1}, página {2}; similaridade {3}): {4}".format(
+            "- {} ({}, página {}; similaridade {}): {}".format(
                 fonte.get("protocolo"), fonte.get("documento"), fonte.get("pagina"),
                 fonte.get("similaridade"), conteudo,
             )
@@ -123,7 +123,9 @@ def answer(question: str, sources: list[dict], model: str = "gpt-4.1-mini") -> d
             "sustentada": True,
         }
     except Exception as exc:
-        logging.warning("Falha ao consultar o modelo (%s); caindo para o modo local.", type(exc).__name__)
+        logging.warning(
+            "Falha ao consultar o modelo (%s); caindo para o modo local.", type(exc).__name__
+        )
         resultado = local_answer(question, sources)
         resultado["aviso"] = f"Falha no modelo: {type(exc).__name__}"
         return resultado

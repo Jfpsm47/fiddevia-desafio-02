@@ -62,7 +62,9 @@ if st.button("Consultar", type="primary", disabled=not pergunta.strip()):
         if not dados.get("fontes"):
             st.write("Nenhum trecho recuperado.")
         for fonte in dados.get("fontes", []):
-            classificacao = ROTULO_CLASSIFICACAO.get(fonte.get("classificacao"), "sem classificação")
+            classificacao = ROTULO_CLASSIFICACAO.get(
+                fonte.get("classificacao"), "sem classificação"
+            )
             st.markdown(
                 f"**{fonte.get('protocolo')}** — {fonte.get('documento')}, "
                 f"página {fonte.get('pagina')} · similaridade {fonte.get('similaridade')} "

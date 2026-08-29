@@ -1,23 +1,32 @@
 """Modelos SQLAlchemy do domínio."""
 from __future__ import annotations
-from datetime import datetime, date
-from sqlalchemy import String, Text, Integer, Float, Date, DateTime, ForeignKey, UniqueConstraint
+
+from datetime import UTC, date, datetime
+
+from sqlalchemy import Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
+
 class Base(DeclarativeBase):
-    pass
+    """Base declarativa dos modelos do domínio."""
 
 class Documento(Base):
+    """Um PDF de entrada, com o método pelo qual foi lido."""
+
     __tablename__ = "documentos"
     id: Mapped[int] = mapped_column(primary_key=True)
     nome_arquivo: Mapped[str] = mapped_column(String(255), unique=True)
     hash_sha256: Mapped[str] = mapped_column(String(64), unique=True)
     total_paginas: Mapped[int] = mapped_column(Integer)
     metodo: Mapped[str] = mapped_column(String(30))
-    processado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    atendimentos: Mapped[list["Atendimento"]] = relationship(back_populates="documento", cascade="all, delete-orphan")
+    processado_em: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    atendimentos: Mapped[list[Atendimento]] = relationship(
+        back_populates="documento", cascade="all, delete-orphan"
+    )
 
 class Atendimento(Base):
+    """Um registro de atendimento extraído de um documento."""
+
     __tablename__ = "atendimentos"
     __table_args__ = (UniqueConstraint("protocolo", name="uq_atendimento_protocolo"),)
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -42,9 +51,13 @@ class Atendimento(Base):
     texto_original: Mapped[str] = mapped_column(Text)
     texto_limpo: Mapped[str] = mapped_column(Text)
     documento: Mapped[Documento] = relationship(back_populates="atendimentos")
-    chunks: Mapped[list["Chunk"]] = relationship(back_populates="atendimento", cascade="all, delete-orphan")
+    chunks: Mapped[list[Chunk]] = relationship(
+        back_populates="atendimento", cascade="all, delete-orphan"
+    )
 
 class Chunk(Base):
+    """Trecho de um atendimento, com metadados para recuperação."""
+
     __tablename__ = "chunks"
     id: Mapped[int] = mapped_column(primary_key=True)
     atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"))
@@ -56,6 +69,8 @@ class Chunk(Base):
     atendimento: Mapped[Atendimento] = relationship(back_populates="chunks")
 
 class ErroProcessamento(Base):
+    """Ocorrência registrada durante o processamento, por etapa e tipo."""
+
     __tablename__ = "erros_processamento"
     id: Mapped[int] = mapped_column(primary_key=True)
     documento_id: Mapped[int | None] = mapped_column(ForeignKey("documentos.id"), nullable=True)
@@ -63,4 +78,4 @@ class ErroProcessamento(Base):
     etapa: Mapped[str] = mapped_column(String(80))
     tipo: Mapped[str] = mapped_column(String(80))
     mensagem: Mapped[str] = mapped_column(Text)
-    registrado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    registrado_em: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

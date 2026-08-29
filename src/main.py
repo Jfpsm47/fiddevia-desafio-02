@@ -23,7 +23,7 @@ def responder(cfg: dict, pergunta: str, top_k: int) -> None:
     print(resultado["resposta"])
     for fonte in resultado.get("fontes", []):
         print(
-            "  - {0} ({1}, p.{2}) similaridade {3}".format(
+            "  - {} ({}, p.{}) similaridade {}".format(
                 fonte.get("protocolo"), fonte.get("documento"),
                 fonte.get("pagina"), fonte.get("similaridade"),
             )
@@ -48,6 +48,11 @@ def main() -> int:
     parser.add_argument("--pergunta", help="consulta em linguagem natural")
     parser.add_argument("--top-k", type=int, default=5, help="quantidade de fontes na resposta")
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="registra o rastreamento completo das exceções no log",
+    )
+    parser.add_argument(
         "--recriar",
         action="store_true",
         help="descarta banco e coleção vetorial antes de processar",
@@ -57,6 +62,7 @@ def main() -> int:
     sys.stdout = console_utf8(sys.stdout)
     sys.stderr = console_utf8(sys.stderr)
     cfg = load_config()
+    cfg["_verbose"] = args.verbose
     if args.recriar:
         for removido in descartar_base(cfg):
             print(f"Removido: {removido}")

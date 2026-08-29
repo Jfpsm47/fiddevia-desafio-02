@@ -8,6 +8,7 @@ class ChromaStore:
     """Coleção persistente de chunks, indexada por similaridade de cosseno."""
 
     def __init__(self, directory: str | Path, collection: str) -> None:
+        """Abre ou cria a coleção persistente no diretório informado."""
         import chromadb
 
         self.client = chromadb.PersistentClient(path=str(directory))
@@ -31,7 +32,9 @@ class ChromaStore:
             ids=ids, documents=documents, metadatas=metadatas, embeddings=embeddings
         )
 
-    def query(self, embedding: list[float], top_k: int = 5, where: dict | None = None) -> list[dict]:
+    def query(
+        self, embedding: list[float], top_k: int = 5, where: dict | None = None
+    ) -> list[dict]:
         """Recupera os chunks mais próximos do vetor de consulta.
 
         Args:

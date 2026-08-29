@@ -34,8 +34,8 @@ def test_ask_limita_top_k():
 def test_modulo_da_api_nao_depende_de_sqlalchemy_para_ser_importado(monkeypatch):
     """A API precisa subir e responder /health sem a camada de persistência.
 
-    Antes, `api` importava `indexer`, que importa SQLAlchemy no topo: um
-    ambiente sem esse pacote abortava a coleta de toda a suíte (BUG-011).
+    Antes, `api` importava `indexer`, que importa SQLAlchemy no topo: um ambiente sem esse
+    pacote abortava a coleta de toda a suíte (BUG-011).
     """
     for nome in [m for m in sys.modules if m.startswith(("src.api", "src.indexer", "sqlalchemy"))]:
         monkeypatch.delitem(sys.modules, nome, raising=False)
@@ -100,7 +100,8 @@ def test_falha_inesperada_e_registrada_em_log(monkeypatch, caplog):
     with caplog.at_level("ERROR"):
         TestClient(app).post("/ask", json={"pergunta": "instalacao do python"})
 
-    assert any("algo imprevisto" in registro.exc_text for registro in caplog.records if registro.exc_text)
+    rastreamentos = [r.exc_text for r in caplog.records if r.exc_text]
+    assert any("algo imprevisto" in texto for texto in rastreamentos)
 
 
 def test_resposta_traz_fontes_e_modo(monkeypatch):

@@ -6,3 +6,23 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+# E/W: pycodestyle · F: pyflakes · I: ordenação de imports · B: bugbear
+# D: docstrings · UP: sintaxe moderna · C4: comprehensions
+select = ["E", "W", "F", "I", "B", "D", "UP", "C4"]
+ignore = [
+    "D203",  # conflita com D211
+    "D213",  # conflita com D212
+    "D401",  # docstrings em português não seguem o modo imperativo do inglês
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D103"]  # os testes se explicam pelo nome
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"

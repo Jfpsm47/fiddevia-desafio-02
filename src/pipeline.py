@@ -42,17 +42,39 @@ def console_utf8(stream):
     return stream
 
 
-def configure_logging(path: Path) -> None:
-    """Configura o log em arquivo (UTF-8) e no console, ambos em UTF-8."""
+def configure_logging(path: Path, verbose: bool = False) -> None:
+    """Configura o log em arquivo (UTF-8) e no console, ambos em UTF-8.
+
+    Args:
+        path: arquivo de log.
+        verbose: inclui o rastreamento completo das exceções. Fora desse modo o
+            log de entrega guarda só a mensagem: o rastreamento traz caminhos
+            absolutos da máquina de quem executou, que o RNF proíbe (BUG-021).
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
         handlers=[
             logging.FileHandler(path, encoding="utf-8"),
             logging.StreamHandler(console_utf8(sys.stderr)),
         ],
     )
+    if not verbose:
+        logging.getLogger().addFilter(_SemRastreamento())
+
+
+class _SemRastreamento(logging.Filter):
+    """Remove o rastreamento das mensagens, preservando a causa em uma linha."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.exc_info:
+            excecao = record.exc_info[1]
+            record.msg = f"{record.getMessage()} [{type(excecao).__name__}: {excecao}]"
+            record.args = ()
+            record.exc_info = None
+            record.exc_text = None
+        return True
 
 
 def split_records(page_text: str) -> list[str]:
@@ -77,8 +99,10 @@ def process_all(cfg: dict) -> pd.DataFrame:
     root = Path(cfg["_root"])
     output = resolve(root, cfg["saida"]["diretorio"])
     output.mkdir(parents=True, exist_ok=True)
-    configure_logging(output / cfg["saida"]["log"])
-    categorias_path = root / "data" / "auxiliares" / "categorias.json"
+    configure_logging(output / cfg["saida"]["log"], verbose=bool(cfg.get("_verbose")))
+    categorias_path = resolve(
+        root, cfg["entrada"].get("categorias", "data/auxiliares/categorias.json")
+    )
     categories = json.loads(categorias_path.read_text(encoding="utf-8"))
     factory = create_session_factory(resolve_sqlite_url(root, cfg["banco"]["url"]))
     pdf_dir = resolve(root, cfg["entrada"]["diretorio_pdfs"])
@@ -86,7 +110,10 @@ def process_all(cfg: dict) -> pd.DataFrame:
     # Verifica o OCR uma vez, antes de processar, em vez de descobrir a falha
     # página a página no meio do trabalho (BUG-002).
     ocr_ok, ocr_msg = verificar_ocr(cfg["ocr"].get("tesseract_cmd") or None, cfg["ocr"]["idioma"])
-    logging.info("OCR: %s", ocr_msg) if ocr_ok else logging.warning("OCR indisponível — %s", ocr_msg)
+    if ocr_ok:
+        logging.info("OCR: %s", ocr_msg)
+    else:
+        logging.warning("OCR indisponível — %s", ocr_msg)
 
     rows: list[dict] = []
     cache_cep: dict[str, tuple[str | None, str | None]] = {}
@@ -95,7 +122,9 @@ def process_all(cfg: dict) -> pd.DataFrame:
         marca = len(rows)
         try:
             with session_scope(factory) as session:
-                _process_document(session, pdf, cfg, categories, rows, cache_cep, vocabulario_municipios)
+                _process_document(
+                    session, pdf, cfg, categories, rows, cache_cep, vocabulario_municipios
+                )
         except Exception as exc:
             # A transação do documento foi revertida: descarta também as linhas
             # que ele havia acrescentado, para que CSV e banco não divirjam.
@@ -433,16 +462,17 @@ def _persist_record(
     if PROTO_RE.fullmatch(lido):
         protocol = lido
     else:
-        protocol = "SEM-PROTOCOLO-{0}-{1}-{2}".format(doc.id, page["pagina"], len(rows) + 1)
+        protocol = "SEM-PROTOCOLO-{}-{}-{}".format(doc.id, page["pagina"], len(rows) + 1)
     if find_by_protocol(session, protocol):
         classification = "duplicado"
         reasons.append("protocolo_duplicado")
 
     # Município e UF vêm do próprio documento; o ViaCEP tem a palavra final
     # quando o CEP resolve, por ser a fonte autoritativa (RF07).
-    municipio, uf = separar_municipio_uf(fields.get("municipio_uf", "")) if fields.get("municipio_uf") else (
-        fields.get("municipio", ""), fields.get("uf", "")
-    )
+    if fields.get("municipio_uf"):
+        municipio, uf = separar_municipio_uf(fields["municipio_uf"])
+    else:
+        municipio, uf = fields.get("municipio", ""), fields.get("uf", "")
     if "municipio" in ilegiveis:
         municipio = ""
     oficial_municipio, oficial_uf = _localidade(normalized.get("cep", ""), cfg, cache_cep)
@@ -551,7 +581,7 @@ def _persist_record(
                 pagina=page["pagina"],
                 etapa="persistencia",
                 tipo=type(exc).__name__,
-                mensagem="{0}: {1}".format(protocol, exc),
+                mensagem=f"{protocol}: {exc}",
             )
         )
         logging.error(
@@ -571,7 +601,7 @@ def _register_document_failure(factory: sessionmaker, pdf: Path, exc: Exception)
                     pagina=None,
                     etapa="documento",
                     tipo=type(exc).__name__,
-                    mensagem="{0}: {1}".format(pdf.name, exc),
+                    mensagem=f"{pdf.name}: {exc}",
                 )
             )
     except Exception:

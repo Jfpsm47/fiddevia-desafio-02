@@ -1,21 +1,32 @@
+# Núcleo do pipeline
 python-dotenv>=1.0
 pydantic>=2.7
 sqlalchemy>=2.0
 pypdf>=5.0
-pdfplumber>=0.11
-pdf2image>=1.17
-pytesseract>=0.3.13
 pandas>=2.2
 numpy>=2.0
 matplotlib>=3.9
 requests>=2.32
-nltk>=3.9
+
+# OCR. O Poppler não é mais necessário: a imagem da página vem do próprio PDF
+# via pypdf. pdf2image fica como alternativa para páginas que não sejam uma
+# imagem única, e exige o Poppler apenas nesse caso.
+pillow>=10.0
+pytesseract>=0.3.13
+pdf2image>=1.17
+
+# Busca semântica e RAG
 sentence-transformers>=3.0
 chromadb>=0.5
+langchain>=0.3
+langchain-openai>=0.2
+
+# Serviço e interface
 fastapi>=0.115
 uvicorn>=0.30
 streamlit>=1.38
-langchain>=0.3
-langchain-openai>=0.2
+
+# Desenvolvimento
 pytest>=8.3
 httpx>=0.27
+ruff>=0.6

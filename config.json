@@ -1,7 +1,8 @@
 {
   "entrada": {
     "diretorio_pdfs": "data/pdfs",
-    "padrao": "*.pdf"
+    "padrao": "*.pdf",
+    "categorias": "data/auxiliares/categorias.json"
   },
   "saida": {
     "diretorio": "output",

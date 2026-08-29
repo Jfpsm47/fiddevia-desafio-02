@@ -27,5 +27,8 @@ def test_diretorio_aninhado_tambem_e_criado(tmp_path):
 def test_banco_em_memoria_nao_tenta_criar_diretorio():
     factory = create_session_factory("sqlite:///:memory:")
     with session_scope(factory) as sessao:
-        sessao.add(Documento(nome_arquivo="a.pdf", hash_sha256="x", total_paginas=1, metodo="extracao_direta"))
+        sessao.add(
+            Documento(nome_arquivo="a.pdf", hash_sha256="x", total_paginas=1,
+                      metodo="extracao_direta")
+        )
     assert True
