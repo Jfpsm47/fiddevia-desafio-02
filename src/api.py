@@ -4,7 +4,6 @@ import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from .config import load_config
-from .indexer import semantic_query
 from .rag import answer
 
 app=FastAPI(title="Atendimentos FIC_DEV",version="1.0.0")
@@ -20,6 +19,8 @@ def health(): return {"status":"ok","modo":"rag" if os.getenv("OPENAI_API_KEY") 
 
 @app.post("/ask")
 def ask(payload:AskRequest):
+    from .indexer import semantic_query  # import tardio: mantém /health e a coleta
+                                         # dos testes livres de SQLAlchemy (BUG-011)
     try:
         sources=semantic_query(cfg,payload.pergunta,payload.top_k,payload.categoria)
         return answer(payload.pergunta,sources,os.getenv("OPENAI_MODEL","gpt-4.1-mini"))
