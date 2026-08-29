@@ -16,7 +16,12 @@ pytest.importorskip("pandas")
 
 from src.database import create_session_factory, session_scope  # noqa: E402
 from src.models import Atendimento, Documento, ErroProcessamento  # noqa: E402
-from src.pipeline import _persist_record, process_all, split_records  # noqa: E402
+from src.pipeline import (  # noqa: E402
+    _metodo_do_documento,
+    _persist_record,
+    process_all,
+    split_records,
+)
 
 PROJETO = Path(__file__).resolve().parents[1]
 
@@ -162,3 +167,48 @@ def test_split_records_separa_registros_e_descarta_cabecalho():
     assert len(partes) == 2
     assert partes[0].startswith("Protocolo AT-001")
     assert partes[1].startswith("Protocolo AT-002")
+
+
+def registro_sem_protocolo(sufixo: str) -> str:
+    """Registro cujo protocolo saiu ilegível da digitalização."""
+    return registro("PROTOCOLO?").replace("Registro de teste.", f"Registro {sufixo}.")
+
+
+def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
+    """Dois `PROTOCOLO?` distintos recebiam a mesma chave e o segundo era
+    classificado como duplicado em vez de inválido (BUG-006)."""
+    factory = create_session_factory("sqlite:///:memory:")
+    linhas: list[dict] = []
+    with session_scope(factory) as sessao:
+        doc = Documento(nome_arquivo="t.pdf", hash_sha256="h", total_paginas=1, metodo="pendente")
+        sessao.add(doc)
+        sessao.flush()
+        for numero, sufixo in ((1, "um"), (2, "dois")):
+            _persist_record(
+                sessao, doc, Path("t.pdf"), {"pagina": numero, "texto": "", "metodo": "extracao_direta"},
+                registro_sem_protocolo(sufixo), CFG_CHUNK, CATEGORIAS, linhas,
+            )
+
+    assert [linha["classificacao"] for linha in linhas] == ["invalido", "invalido"]
+    chaves = {linha["protocolo"] for linha in linhas}
+    assert len(chaves) == 2, "cada registro ilegível precisa de uma chave própria"
+    assert all(chave.startswith("SEM-PROTOCOLO-") for chave in chaves)
+    assert all(linha["protocolo_bruto"] == "PROTOCOLO?" for linha in linhas), "o valor lido é preservado"
+    assert all(len(chave) <= 30 for chave in chaves), "a coluna protocolo tem 30 caracteres"
+
+
+@pytest.mark.parametrize(
+    "metodos,esperado",
+    [
+        (["extracao_direta", "extracao_direta"], "extracao_direta"),
+        (["ocr", "ocr"], "ocr"),
+        (["ocr_pendente", "ocr_pendente"], "falhou"),
+        (["ocr", "ocr_pendente"], "misto"),
+        (["extracao_direta", "ocr"], "misto"),
+    ],
+)
+def test_metodo_do_documento_reflete_o_resultado(metodos, esperado):
+    """O método era decidido antes de processar: um documento cujo OCR falhou
+    inteiro ficava gravado como "ocr" (BUG-022)."""
+    paginas = [{"metodo": m} for m in metodos]
+    assert _metodo_do_documento(paginas) == esperado

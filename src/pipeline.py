@@ -19,7 +19,7 @@ from .models import Atendimento, Chunk, Documento, ErroProcessamento
 from .ocr_processor import ocr_page
 from .pdf_processor import extract_pdf_pages
 from .text_processor import metadata_json, preprocess, split_chunks
-from .validation import clean_text, extract_fields, validate_record
+from .validation import PROTO_RE, clean_text, extract_fields, validate_record
 
 
 def configure_logging(path: Path) -> None:
@@ -99,12 +99,11 @@ def _process_document(
         return
 
     page_data = extract_pdf_pages(pdf, cfg["ocr"]["min_caracteres_extracao_direta"])
-    method = "ocr" if all(p["metodo"] == "ocr_pendente" for p in page_data) else "extracao_direta"
     doc = Documento(
         nome_arquivo=pdf.name,
         hash_sha256=digest,
         total_paginas=len(page_data),
-        metodo=method,
+        metodo="pendente",
     )
     session.add(doc)
     session.flush()
@@ -130,6 +129,22 @@ def _process_document(
         for raw in split_records(text):
             _persist_record(session, doc, pdf, page, raw, cfg, categories, rows)
 
+    # O método do documento reflete o que de fato aconteceu, não a intenção
+    # avaliada antes de processar (BUG-022).
+    doc.metodo = _metodo_do_documento(page_data)
+    session.flush()
+
+
+def _metodo_do_documento(page_data: list[dict]) -> str:
+    """Resume, em uma palavra, como as páginas de um documento foram lidas."""
+    metodos = {p["metodo"] for p in page_data}
+    if metodos == {"ocr_pendente"}:
+        return "falhou"
+    processados = metodos - {"ocr_pendente"}
+    if len(processados) == 1 and not metodos & {"ocr_pendente"}:
+        return processados.pop()
+    return "misto"
+
 
 def _persist_record(
     session: Session,
@@ -148,8 +163,14 @@ def _persist_record(
     """
     fields = extract_fields(raw)
     classification, reasons, normalized = validate_record(fields, categories)
-    fallback = "INVALIDO-{0}-{1}-{2}".format(doc.id, page["pagina"], len(rows) + 1)
-    protocol = normalized.get("protocolo") or fallback
+    lido = normalized.get("protocolo") or ""
+    # A entrega usava `lido or fallback`: como "PROTOCOLO?" é verdadeiro em
+    # contexto booleano, o fallback nunca disparava e dois registros ilegíveis
+    # colidiam na mesma chave, virando falsa duplicata (BUG-006).
+    if PROTO_RE.fullmatch(lido):
+        protocol = lido
+    else:
+        protocol = "SEM-PROTOCOLO-{0}-{1}-{2}".format(doc.id, page["pagina"], len(rows) + 1)
     if find_by_protocol(session, protocol):
         classification = "duplicado"
         reasons.append("protocolo_duplicado")
@@ -157,6 +178,7 @@ def _persist_record(
     row = {
         **fields,
         "protocolo": protocol,
+        "protocolo_bruto": lido,
         "categoria": normalized.get("categoria_normalizada") or fields.get("categoria"),
         "data": normalized.get("data_obj"),
         "tempo_minutos": normalized.get("tempo_obj"),
