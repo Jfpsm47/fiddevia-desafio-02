@@ -6,7 +6,7 @@ import json, logging, re
 import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from .config import resolve
+from .config import resolve, resolve_sqlite_url
 from .database import create_session_factory, session_scope, find_by_protocol
 from .models import Documento, Atendimento, Chunk, ErroProcessamento
 from .pdf_processor import extract_pdf_pages
@@ -27,10 +27,7 @@ def process_all(cfg: dict) -> pd.DataFrame:
     root=Path(cfg["_root"]); output=resolve(root,cfg["saida"]["diretorio"]); output.mkdir(parents=True,exist_ok=True)
     configure_logging(output/cfg["saida"]["log"])
     categories=json.loads((root/"data"/"auxiliares"/"categorias.json").read_text(encoding="utf-8"))
-    db_url=cfg["banco"]["url"]
-    if db_url.startswith("sqlite:/// "): db_url="sqlite:///"+str(root/db_url.removeprefix("sqlite:/// "))
-    elif db_url.startswith("sqlite:///") and not db_url.startswith("sqlite:////"): db_url="sqlite:///"+str(root/db_url[10:])
-    factory=create_session_factory(db_url)
+    factory=create_session_factory(resolve_sqlite_url(root,cfg["banco"]["url"]))
     pdf_dir=resolve(root,cfg["entrada"]["diretorio_pdfs"]); rows=[]
     with session_scope(factory) as session:
         for pdf in sorted(pdf_dir.glob(cfg["entrada"]["padrao"])):
