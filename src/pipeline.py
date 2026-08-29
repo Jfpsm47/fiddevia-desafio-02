@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import sys
 from hashlib import sha256
 from pathlib import Path
 
@@ -16,19 +17,38 @@ from .analytics import export_results, generate_charts
 from .config import resolve, resolve_sqlite_url
 from .database import create_session_factory, find_by_protocol, session_scope
 from .models import Atendimento, Chunk, Documento, ErroProcessamento
-from .ocr_processor import ocr_page
+from .ocr_processor import ocr_page, verificar_ocr
 from .pdf_processor import extract_pdf_pages
 from .text_processor import metadata_json, preprocess, split_chunks
 from .validation import PROTO_RE, clean_text, extract_fields, validate_record
 
 
+def console_utf8(stream):
+    """Reconfigura um fluxo do console para UTF-8, no próprio objeto.
+
+    Sem isso, o console do Windows corrompe os acentos das mensagens
+    ("Documento j? processado"), enquanto o arquivo de log sai correto
+    (BUG-020). A reconfiguração é feita no lugar de propósito: encapsular o
+    fluxo em um TextIOWrapper novo faria o buffer original ser fechado quando
+    o invólucro fosse coletado, derrubando a saída do processo.
+    """
+    try:
+        stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
+    return stream
+
+
 def configure_logging(path: Path) -> None:
-    """Configura o log em arquivo (UTF-8) e no console."""
+    """Configura o log em arquivo (UTF-8) e no console, ambos em UTF-8."""
     path.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[logging.FileHandler(path, encoding="utf-8"), logging.StreamHandler()],
+        handlers=[
+            logging.FileHandler(path, encoding="utf-8"),
+            logging.StreamHandler(console_utf8(sys.stderr)),
+        ],
     )
 
 
@@ -60,6 +80,11 @@ def process_all(cfg: dict) -> pd.DataFrame:
     factory = create_session_factory(resolve_sqlite_url(root, cfg["banco"]["url"]))
     pdf_dir = resolve(root, cfg["entrada"]["diretorio_pdfs"])
 
+    # Verifica o OCR uma vez, antes de processar, em vez de descobrir a falha
+    # página a página no meio do trabalho (BUG-002).
+    ocr_ok, ocr_msg = verificar_ocr(cfg["ocr"].get("tesseract_cmd") or None, cfg["ocr"]["idioma"])
+    logging.info("OCR: %s", ocr_msg) if ocr_ok else logging.warning("OCR indisponível — %s", ocr_msg)
+
     rows: list[dict] = []
     for pdf in sorted(pdf_dir.glob(cfg["entrada"]["padrao"])):
         marca = len(rows)
@@ -83,6 +108,34 @@ def process_all(cfg: dict) -> pd.DataFrame:
         export_results(df, output, cfg["saida"]["csv"], cfg["saida"]["indicadores"])
         generate_charts(df, resolve(root, cfg["saida"]["graficos"]))
     return df
+
+
+def documentos_sem_registros(cfg: dict) -> list[str]:
+    """Lista os documentos que não produziram nenhum atendimento.
+
+    É o sinal que faltava: a entrega perdia um PDF inteiro e ainda assim
+    encerrava anunciando sucesso (BUG-002).
+    """
+    root = Path(cfg["_root"])
+    factory = create_session_factory(resolve_sqlite_url(root, cfg["banco"]["url"]))
+    with session_scope(factory) as session:
+        documentos = session.scalars(select(Documento)).all()
+        vazios = []
+        for d in documentos:
+            tem_atendimento = session.scalar(
+                select(Atendimento).where(Atendimento.documento_id == d.id).limit(1)
+            )
+            # Um documento só de duplicatas não é perda: os registros foram
+            # lidos e conscientemente não reinseridos.
+            tem_duplicata = session.scalar(
+                select(ErroProcessamento)
+                .where(ErroProcessamento.documento_id == d.id)
+                .where(ErroProcessamento.etapa == "deduplicacao")
+                .limit(1)
+            )
+            if not tem_atendimento and not tem_duplicata:
+                vazios.append(d.nome_arquivo)
+    return vazios
 
 
 def _process_document(
@@ -112,7 +165,10 @@ def _process_document(
         text = page["texto"]
         if page["metodo"] == "ocr_pendente":
             try:
-                text = ocr_page(pdf, page["pagina"], cfg["ocr"]["dpi"], cfg["ocr"]["idioma"])
+                text = ocr_page(
+                    pdf, page["pagina"], cfg["ocr"]["dpi"], cfg["ocr"]["idioma"],
+                    cfg["ocr"].get("tesseract_cmd") or None,
+                )
                 page["metodo"] = "ocr"
             except Exception as exc:
                 session.add(
