@@ -10,3 +10,6 @@ output/*.csv
 output/*.json
 output/*.log
 output/graficos/*.png
+
+# indice vetorial do snapshot de auditoria (regeneravel)
+old_database/chroma/

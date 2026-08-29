@@ -1,0 +1,109 @@
+2026-08-29 14:37:06,288 ERROR OCR falhou: atendimentos_digitalizados.pdf p.1
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,290 ERROR OCR falhou: atendimentos_digitalizados.pdf p.2
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,291 ERROR OCR falhou: atendimentos_digitalizados.pdf p.3
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,292 ERROR OCR falhou: atendimentos_digitalizados.pdf p.4
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,294 ERROR OCR falhou: atendimentos_digitalizados.pdf p.5
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,295 ERROR OCR falhou: atendimentos_digitalizados.pdf p.6
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:37:06,296 ERROR OCR falhou: atendimentos_digitalizados.pdf p.7
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 7, in ocr_page
+    from pdf2image import convert_from_path
+ModuleNotFoundError: No module named 'pdf2image'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\pipeline.py", line 46, in process_all
+    try: text=ocr_page(pdf,page["pagina"],cfg["ocr"]["dpi"],cfg["ocr"]["idioma"]); page["metodo"]="ocr"
+              ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Workspace\_Estudo\Fic_Dev_IA\Desafio 02\solucao_referencia_desafio_final_python_ia\src\ocr_processor.py", line 10, in ocr_page
+    raise RuntimeError("Instale pdf2image e pytesseract para executar OCR") from exc
+RuntimeError: Instale pdf2image e pytesseract para executar OCR
+2026-08-29 14:40:16,451 INFO Documento já processado; ignorando: atendimentos_digitais.pdf
+2026-08-29 14:40:16,461 INFO Documento já processado; ignorando: atendimentos_digitalizados.pdf
+2026-08-29 14:40:16,498 INFO Documento já processado; ignorando: atendimentos_duplicados.pdf
+2026-08-29 14:40:16,556 INFO Documento já processado; ignorando: atendimentos_incompletos.pdf

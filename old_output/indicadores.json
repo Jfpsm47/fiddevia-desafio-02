@@ -1,0 +1,27 @@
+{
+  "total_registros": 75,
+  "por_classificacao": {
+    "valido": 51,
+    "invalido": 13,
+    "duplicado": 11
+  },
+  "por_categoria": {
+    "Python e bibliotecas": 12,
+    "Conectividade": 11,
+    "VSCode e ferramentas": 11,
+    "Atividades e arquivos": 10,
+    "Instalacao de software": 10,
+    "Acesso e senha": 10,
+    "Ambiente virtual": 9,
+    "categoria desconhecida": 2
+  },
+  "por_status": {
+    "Pendente": 26,
+    "Em atendimento": 25,
+    "Concluido": 24
+  },
+  "tempo_medio": 50.82608695652174,
+  "tempo_mediano": 48.0,
+  "tempo_desvio_padrao": 22.7716811939355,
+  "percentual_ocr": 0.0
+}
