@@ -4,13 +4,13 @@ from pathlib import Path
 import json
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
+from .config import resolve_sqlite_url
 from .models import Chunk
 from .embeddings import EmbeddingService
 from .vector_store import ChromaStore
 
 def build_index(cfg: dict) -> int:
-    root=Path(cfg["_root"]); url=cfg["banco"]["url"]
-    if url.startswith("sqlite:///") and not url.startswith("sqlite:////"): url="sqlite:///"+str(root/url[10:])
+    root=Path(cfg["_root"]); url=resolve_sqlite_url(root,cfg["banco"]["url"])
     with Session(create_engine(url)) as session: chunks=list(session.scalars(select(Chunk)).all())
     if not chunks: return 0
     service=EmbeddingService(cfg["embeddings"]["modelo"]); docs=[c.conteudo for c in chunks]; vectors=service.encode(docs)

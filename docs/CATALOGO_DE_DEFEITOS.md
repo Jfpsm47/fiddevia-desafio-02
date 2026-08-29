@@ -6,7 +6,9 @@
 **Etapa do desafio:** 4 — Correção dos defeitos (registro prévio)
 **Documento de origem:** `docs/RELATORIO_DIAGNOSTICO_INICIAL.md`
 
-**Total: 34 defeitos** — 3 P0, 13 P1, 15 P2, 3 P3. Todos com status **Aberto** nesta versão.
+**Total: 34 defeitos** — 3 P0, 13 P1, 15 P2, 3 P3.
+
+**Situação em 29/08/2026, após a Onda 1:** 5 corrigidos (BUG-001, BUG-003, BUG-010, BUG-011, BUG-029), 1 em correção (BUG-031), 28 abertos.
 
 ---
 
@@ -43,7 +45,7 @@ Trinta e um defeitos foram **reproduzidos em execução**. Três vêm de **inspe
 
 ### Linha de base preservada
 
-O estado "antes das correções" está em `old_database/` e `old_output/`, na raiz do desafio. É a evidência que sustenta a comparação da Etapa 3 — não sobrescrever.
+O estado "antes das correções" está em `old_database/` e `old_output/`, na raiz do projeto (versionados no commit e6b5e29). É a evidência que sustenta a comparação da Etapa 3 — não sobrescrever.
 
 ---
 
@@ -97,7 +99,7 @@ O estado "antes das correções" está em `old_database/` e `old_output/`, na ra
 |---|---|
 | **Prioridade** | P0 |
 | **Local** | `src/database.py:8-11`; `config.json` → `banco.url`; `.gitignore` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 1, commit 5f4ce70 |
 
 **Descrição.** Com o diretório `database/` ausente, `create_engine` falha imediatamente e nada é processado:
 
@@ -170,7 +172,7 @@ Ver `BUG-032`: corrigir este defeito isoladamente **não** recupera os 25 regist
 |---|---|
 | **Prioridade** | P0 |
 | **Local** | `src/pipeline.py:35-61`; `src/database.py:13-23` |
-| **Status** | Aberto — **constatado por inspeção estática, não reproduzido** |
+| **Status** | Corrigido — Onda 1, commit e3bba78 |
 
 **Descrição.** `session_scope(factory)` envolve os quatro laços aninhados de `process_all` — documentos, páginas, registros e chunks — e só faz `commit` ao final. Uma exceção no último registro do último documento dispara `rollback` e descarta o trabalho dos quatro documentos. Não há `try/except` por registro.
 
@@ -390,7 +392,7 @@ As colunas `municipio` e `uf` também não aparecem no CSV exportado.
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | raiz do projeto (ausência de `pyproject.toml` / `conftest.py`); `README.md` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 1, commit 566e1d8 |
 
 **Descrição.** O comando publicado no README falha:
 
@@ -419,7 +421,7 @@ E   ModuleNotFoundError: No module named 'src'
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `tests/test_api.py:2`; `src/api.py:7`; `src/indexer.py:5` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 1, commit 566e1d8 |
 
 **Descrição.** `test_api.py` importa `src.api`, que importa `src.indexer`, que importa `sqlalchemy` no topo do módulo. Sem SQLAlchemy instalado, a coleta é abortada e **nenhum** teste roda — nem os quatro que passariam.
 
@@ -767,7 +769,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-031"></a>
 ## BUG-031 — A entrega não é um repositório Git
 
-**Prioridade** P2 · **Local** raiz do projeto · **Status** Aberto
+**Prioridade** P2 · **Local** raiz do projeto · **Status** Em correção — repositório, branch e commits feitos; tag v1.0.0 ao final das ondas
 
 **Descrição.** Existe `.gitignore`, mas não existe `.git`, nem commits, nem branch de desenvolvimento, nem merge, nem a tag `v1.0.0`. O README reconhece a limitação e a atribui ao formato de entrega em ZIP.
 
@@ -829,7 +831,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-029"></a>
 ## BUG-029 — Ramo morto na resolução da URL do banco
 
-**Prioridade** P3 · **Local** `src/pipeline.py:31` · **Status** Aberto — constatado por inspeção estática
+**Prioridade** P3 · **Local** `src/pipeline.py:31` · **Status** Corrigido — Onda 1, commit 5f4ce70
 
 **Descrição.** `if db_url.startswith("sqlite:/// ")` — com um espaço após as três barras — nunca é verdadeiro. A linha seguinte trata o caso real.
 

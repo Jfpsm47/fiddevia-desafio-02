@@ -1,0 +1,8 @@
+# Configuração de ferramentas do projeto.
+# O `pythonpath` faz o comando `pytest`, publicado no README, encontrar o
+# pacote `src` a partir da raiz — sem ele a coleta falha com
+# "ModuleNotFoundError: No module named 'src'" (BUG-010).
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
