@@ -527,6 +527,10 @@ def _persist_record(
                     "documento": pdf.name,
                     "pagina": page["pagina"],
                     "categoria": row["categoria"] or "",
+                    # Sem a classificação nos metadados não há como impedir que
+                    # um registro rejeitado embase uma resposta (BUG-033).
+                    "classificacao": classification,
+                    "metodo": page["metodo"],
                 }
                 session.add(
                     Chunk(

@@ -10,8 +10,32 @@ from .pipeline import console_utf8, descartar_base, documentos_sem_registros, pr
 from .rag import answer
 
 
+def responder(cfg: dict, pergunta: str, top_k: int) -> None:
+    """Consulta a base e imprime a resposta com suas fontes."""
+    from .indexer import ColecaoVazia
+
+    try:
+        fontes = semantic_query(cfg, pergunta, top_k)
+    except ColecaoVazia as exc:
+        print(str(exc), file=sys.stderr)
+        return
+    resultado = answer(pergunta, fontes)
+    print(resultado["resposta"])
+    for fonte in resultado.get("fontes", []):
+        print(
+            "  - {0} ({1}, p.{2}) similaridade {3}".format(
+                fonte.get("protocolo"), fonte.get("documento"),
+                fonte.get("pagina"), fonte.get("similaridade"),
+            )
+        )
+
+
 def main() -> int:
     """Executa o pipeline e, opcionalmente, a indexação e uma consulta.
+
+    Returns:
+    Sem argumentos, processa os PDFs. Com ``--pergunta`` ou ``--indexar``, só
+    executa o que foi pedido, a menos que ``--processar`` seja informado.
 
     Returns:
         ``0`` em caso de sucesso; ``1`` quando algum documento não produziu
@@ -19,6 +43,7 @@ def main() -> int:
         sucesso enquanto descartava um PDF inteiro (BUG-002).
     """
     parser = argparse.ArgumentParser(description="Processa e consulta os atendimentos")
+    parser.add_argument("--processar", action="store_true", help="força o processamento dos PDFs")
     parser.add_argument("--indexar", action="store_true", help="indexa os chunks no ChromaDB")
     parser.add_argument("--pergunta", help="consulta em linguagem natural")
     parser.add_argument("--top-k", type=int, default=5, help="quantidade de fontes na resposta")
@@ -35,6 +60,16 @@ def main() -> int:
     if args.recriar:
         for removido in descartar_base(cfg):
             print(f"Removido: {removido}")
+
+    # Consultar não deve reprocessar os PDFs: `--pergunta` sozinho atravessava
+    # o pipeline inteiro antes de responder (BUG-026). `--indexar` continua
+    # processando antes, como o README documenta.
+    if args.pergunta and not args.processar:
+        if args.indexar:
+            print(f"Chunks indexados: {build_index(cfg)}")
+        responder(cfg, args.pergunta, args.top_k)
+        return 0
+
     df = process_all(cfg)
     print(f"Registros encontrados: {len(df)}")
 
@@ -54,8 +89,7 @@ def main() -> int:
     if args.indexar:
         print(f"Chunks indexados: {build_index(cfg)}")
     if args.pergunta:
-        sources = semantic_query(cfg, args.pergunta, args.top_k)
-        print(answer(args.pergunta, sources))
+        responder(cfg, args.pergunta, args.top_k)
 
     return 1 if vazios else 0
 
