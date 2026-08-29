@@ -101,7 +101,9 @@ def build_indicators(
         "por_municipio": _contagem(util.get("municipio", pd.Series(dtype=str)).dropna()),
         "por_uf": _contagem(util.get("uf", pd.Series(dtype=str)).dropna()),
         "por_metodo_extracao": _contagem(df.get("metodo", pd.Series(dtype=str))),
-        "categoria_maior_volume": max(por_categoria, key=por_categoria.get) if por_categoria else None,
+        "categoria_maior_volume": (
+            max(por_categoria, key=por_categoria.get) if por_categoria else None
+        ),
         "categoria_maior_tempo_medio": (
             str(tempo_por_categoria.idxmax()) if len(tempo_por_categoria) else None
         ),
@@ -165,10 +167,13 @@ def generate_charts(df: pd.DataFrame, directory: str | Path) -> list[Path]:
     gerados = []
 
     destino = path / "atendimentos_categoria.png"
-    _barras(categorias.value_counts(), "Atendimentos por categoria", "Quantidade", "#1F4E78", destino)
+    _barras(
+        categorias.value_counts(), "Atendimentos por categoria", "Quantidade", "#1F4E78", destino
+    )
     gerados.append(destino)
 
-    tempos = util.assign(_t=pd.to_numeric(util.get("tempo_minutos", pd.Series(dtype=float)), errors="coerce"))
+    coluna = util.get("tempo_minutos", pd.Series(dtype=float))
+    tempos = util.assign(_t=pd.to_numeric(coluna, errors="coerce"))
     media = tempos.groupby(categorias)["_t"].mean().dropna()
     destino = path / "tempo_medio_categoria.png"
     _barras(media, "Tempo médio por categoria", "Minutos", "#D6A84B", destino)
@@ -177,7 +182,10 @@ def generate_charts(df: pd.DataFrame, directory: str | Path) -> list[Path]:
     municipios = util.get("municipio", pd.Series(dtype=str)).dropna()
     destino = path / "atendimentos_municipio.png"
     if not municipios.empty:
-        _barras(municipios.value_counts(), "Atendimentos por município", "Quantidade", "#2E7D5B", destino)
+        _barras(
+            municipios.value_counts(), "Atendimentos por município",
+            "Quantidade", "#2E7D5B", destino,
+        )
         gerados.append(destino)
     else:
         # Sem município resolvido, o terceiro gráfico obrigatório recai sobre

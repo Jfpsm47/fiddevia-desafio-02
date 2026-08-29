@@ -147,5 +147,7 @@ def ocr_page(
     try:
         return pytesseract.image_to_string(imagem, lang=language)
     except pytesseract.TesseractError:
-        logging.warning("Idioma '%s' indisponível na página %s; usando 'eng'.", language, page_number)
+        logging.warning(
+            "Idioma '%s' indisponível na página %s; usando 'eng'.", language, page_number
+        )
         return pytesseract.image_to_string(imagem, lang="eng")

@@ -16,13 +16,13 @@ pytest.importorskip("pandas")
 
 from src.database import create_session_factory, session_scope  # noqa: E402
 from src.models import Atendimento, Documento, ErroProcessamento  # noqa: E402
-from src.validation import extract_fields  # noqa: E402
 from src.pipeline import (  # noqa: E402
     _metodo_do_documento,
     _persist_record,
     process_all,
     split_records,
 )
+from src.validation import extract_fields  # noqa: E402
 
 PROJETO = Path(__file__).resolve().parents[1]
 
@@ -58,7 +58,8 @@ def test_falha_de_integridade_isola_apenas_o_registro(monkeypatch):
     monkeypatch.setattr("src.pipeline.preprocess", preprocess_defeituoso)
 
     with session_scope(factory) as sessao:
-        doc = Documento(nome_arquivo="t.pdf", hash_sha256="h", total_paginas=1, metodo="extracao_direta")
+        doc = Documento(nome_arquivo="t.pdf", hash_sha256="h", total_paginas=1,
+                        metodo="extracao_direta")
         sessao.add(doc)
         sessao.flush()
         pagina = {"pagina": 1, "texto": "", "metodo": "extracao_direta"}
@@ -184,8 +185,11 @@ def registro_sem_protocolo(sufixo: str) -> str:
 
 
 def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
-    """Dois `PROTOCOLO?` distintos recebiam a mesma chave e o segundo era
-    classificado como duplicado em vez de inválido (BUG-006)."""
+    """Protocolos ilegíveis distintos precisam de chaves distintas.
+
+    Os dois `PROTOCOLO?` colidiam e o segundo era classificado como duplicado
+    em vez de inválido (BUG-006).
+    """
     factory = create_session_factory("sqlite:///:memory:")
     linhas: list[dict] = []
     with session_scope(factory) as sessao:
@@ -194,7 +198,8 @@ def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
         sessao.flush()
         for numero, sufixo in ((1, "um"), (2, "dois")):
             _persist_record(
-                sessao, doc, Path("t.pdf"), {"pagina": numero, "texto": "", "metodo": "extracao_direta"},
+                sessao, doc, Path("t.pdf"),
+                {"pagina": numero, "texto": "", "metodo": "extracao_direta"},
                 {"campos": extract_fields(registro_sem_protocolo(sufixo)), "ilegiveis": set(),
                  "texto": registro_sem_protocolo(sufixo)},
                 CFG_CHUNK, CATEGORIAS, linhas, {}, {},
@@ -204,7 +209,8 @@ def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
     chaves = {linha["protocolo"] for linha in linhas}
     assert len(chaves) == 2, "cada registro ilegível precisa de uma chave própria"
     assert all(chave.startswith("SEM-PROTOCOLO-") for chave in chaves)
-    assert all(linha["protocolo_bruto"] == "PROTOCOLO?" for linha in linhas), "o valor lido é preservado"
+    lidos = [linha["protocolo_bruto"] for linha in linhas]
+    assert lidos == ["PROTOCOLO?", "PROTOCOLO?"], "o valor lido é preservado"
     assert all(len(chave) <= 30 for chave in chaves), "a coluna protocolo tem 30 caracteres"
 
 
@@ -219,8 +225,11 @@ def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
     ],
 )
 def test_metodo_do_documento_reflete_o_resultado(metodos, esperado):
-    """O método era decidido antes de processar: um documento cujo OCR falhou
-    inteiro ficava gravado como "ocr" (BUG-022)."""
+    """O método do documento reflete o resultado, não a intenção.
+
+    Ele era decidido antes de processar: um documento cujo OCR falhou inteiro
+    ficava gravado como "ocr" (BUG-022).
+    """
     paginas = [{"metodo": m} for m in metodos]
     assert _metodo_do_documento(paginas) == esperado
 
@@ -228,8 +237,11 @@ def test_metodo_do_documento_reflete_o_resultado(metodos, esperado):
 # --- canonização de município (BUG-007) ---
 
 def test_grafias_do_mesmo_municipio_contam_como_uma():
-    """"Cáceres" do ViaCEP e "Caceres" do documento eram cidades diferentes
-    no indicador por município."""
+    """As grafias de um mesmo município contam como uma só.
+
+    "Cáceres" do ViaCEP e "Caceres" do documento eram cidades diferentes no
+    indicador por município.
+    """
     from src.pipeline import _canonizar_municipio, _registrar_municipio
 
     vocabulario: dict[str, str] = {}

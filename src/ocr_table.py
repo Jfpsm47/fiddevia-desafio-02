@@ -106,7 +106,7 @@ def detectar_grade(imagem) -> tuple[list[list[int]], list[int]]:
 
     registros: list[list[int]] = []
     atual = horizontais[:1]
-    for anterior, seguinte in zip(horizontais, horizontais[1:]):
+    for anterior, seguinte in zip(horizontais, horizontais[1:], strict=False):
         if seguinte - anterior > 25:
             atual.append(seguinte)
         else:
@@ -149,7 +149,9 @@ def detectar_grade(imagem) -> tuple[list[list[int]], list[int]]:
     return registros, [x for x, _ in agrupados]
 
 
-def ler_celula(imagem, caixa, whitelist: str | None, escala: int = 4, resample: str = "LANCZOS") -> str:
+def ler_celula(
+    imagem, caixa, whitelist: str | None, escala: int = 4, resample: str = "LANCZOS"
+) -> str:
     """Executa OCR em uma célula, com o alfabeto restrito ao tipo do campo."""
     import pytesseract
     from PIL import Image
@@ -334,7 +336,9 @@ def extrair_registros(imagem, categorias: dict) -> list[dict[str, Any]]:
         campos["data"] = normalizar_data(campos.get("data", ""))
         celula_cep = campos.get("cep", "")
         campos["cep"] = normalizar_cep(celula_cep)
-        resto = celula_cep.replace(campos["cep"], "", 1) if campos["cep"] in celula_cep else celula_cep
+        resto = celula_cep
+        if campos["cep"] and campos["cep"] in celula_cep:
+            resto = celula_cep.replace(campos["cep"], "", 1)
         municipio, uf = separar_municipio_uf(resto)
         campos["uf"] = uf
         if municipio and municipio_plausivel(municipio):

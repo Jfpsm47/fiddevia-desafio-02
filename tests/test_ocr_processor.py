@@ -33,10 +33,22 @@ def test_todas_as_paginas_digitalizadas_produzem_imagem():
 
 
 @pytest.mark.skipif(not DIGITAL.exists(), reason="PDF oficial ausente")
-def test_pagina_sem_imagem_unica_exige_rasterizacao():
-    """Páginas de texto não têm uma imagem única; o caminho alternativo assume."""
-    with pytest.raises(Exception):
-        imagem_da_pagina(DIGITAL, 1)
+def test_pagina_sem_imagem_unica_recorre_a_rasterizacao(monkeypatch):
+    """Páginas de texto não têm uma imagem única; o caminho alternativo assume.
+
+    O teste verifica a decisão, não o resultado: rasterizar exige o Poppler,
+    que pode não estar instalado na máquina que roda a suíte.
+    """
+    chamadas = []
+
+    def rasterizar(caminho, **kwargs):
+        chamadas.append(kwargs)
+        return ["imagem-simulada"]
+
+    monkeypatch.setattr("pdf2image.convert_from_path", rasterizar)
+
+    assert imagem_da_pagina(DIGITAL, 1, dpi=300) == "imagem-simulada"
+    assert chamadas and chamadas[0]["dpi"] == 300
 
 
 def test_verificacao_avisa_quando_o_tesseract_nao_e_encontrado(monkeypatch):

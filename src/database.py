@@ -1,9 +1,9 @@
 """Criação do banco, sessão e operações CRUD."""
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine import make_url

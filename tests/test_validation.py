@@ -34,7 +34,10 @@ def test_email_invalido():
 
 # --- BUG-004: os documentos marcam campo ausente com o literal [vazio] ---
 
-@pytest.mark.parametrize("marcador", ["[vazio]", "[VAZIO]", "", "  ", "N/A", "-", "--", "?", "nao informado"])
+@pytest.mark.parametrize(
+    "marcador",
+    ["[vazio]", "[VAZIO]", "", "  ", "N/A", "-", "--", "?", "nao informado"],
+)
 def test_marcadores_de_ausencia_sao_reconhecidos(marcador):
     assert is_missing(marcador)
 
@@ -90,7 +93,9 @@ def test_cada_campo_malformado_gera_invalido(campo, valor, motivo):
     assert motivo in motivos
 
 
-@pytest.mark.parametrize("campo", ["protocolo", "data", "email", "cep", "categoria", "tempo_minutos"])
+@pytest.mark.parametrize(
+    "campo", ["protocolo", "data", "email", "cep", "categoria", "tempo_minutos"]
+)
 def test_cada_campo_ausente_gera_incompleto(campo):
     classificacao, motivos, _ = classificar(**{campo: "[vazio]"})
     assert classificacao == "incompleto"

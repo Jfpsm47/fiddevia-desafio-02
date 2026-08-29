@@ -1,4 +1,5 @@
-from src.text_processor import split_chunks, preprocess
+from src.text_processor import preprocess, split_chunks
+
 
 def test_chunks_have_overlap_and_limit():
     chunks=split_chunks("texto de exemplo "*100,size=120,overlap=20)
