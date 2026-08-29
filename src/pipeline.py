@@ -17,7 +17,8 @@ from .analytics import export_results, generate_charts
 from .config import resolve, resolve_sqlite_url
 from .database import create_session_factory, find_by_protocol, session_scope
 from .models import Atendimento, Chunk, Documento, ErroProcessamento
-from .ocr_processor import ocr_page, verificar_ocr
+from .ocr_processor import imagem_da_pagina, verificar_ocr
+from .ocr_table import extrair_registros
 from .pdf_processor import extract_pdf_pages
 from .text_processor import metadata_json, preprocess, split_chunks
 from .validation import PROTO_RE, clean_text, extract_fields, validate_record
@@ -162,13 +163,9 @@ def _process_document(
     session.flush()
 
     for page in page_data:
-        text = page["texto"]
         if page["metodo"] == "ocr_pendente":
             try:
-                text = ocr_page(
-                    pdf, page["pagina"], cfg["ocr"]["dpi"], cfg["ocr"]["idioma"],
-                    cfg["ocr"].get("tesseract_cmd") or None,
-                )
+                extraidos = _registros_por_ocr(pdf, page, cfg, categories)
                 page["metodo"] = "ocr"
             except Exception as exc:
                 session.add(
@@ -182,8 +179,13 @@ def _process_document(
                 )
                 logging.exception("OCR falhou: %s p.%s", pdf.name, page["pagina"])
                 continue
-        for raw in split_records(text):
-            _persist_record(session, doc, pdf, page, raw, cfg, categories, rows)
+        else:
+            extraidos = [
+                {"campos": extract_fields(raw), "ilegiveis": set(), "texto": raw}
+                for raw in split_records(page["texto"])
+            ]
+        for registro in extraidos:
+            _persist_record(session, doc, pdf, page, registro, cfg, categories, rows)
 
     # O método do documento reflete o que de fato aconteceu, não a intenção
     # avaliada antes de processar (BUG-022).
@@ -202,12 +204,27 @@ def _metodo_do_documento(page_data: list[dict]) -> str:
     return "misto"
 
 
+def _registros_por_ocr(pdf: Path, page: dict, cfg: dict, categories: dict) -> list[dict]:
+    """Lê uma página digitalizada célula a célula.
+
+    A extração por texto corrido não funciona nesses documentos: o OCR corrompe
+    os próprios rótulos e nenhum padrão casa (BUG-032).
+    """
+    from .ocr_processor import configurar_tesseract
+
+    configurar_tesseract(cfg["ocr"].get("tesseract_cmd") or None)
+    imagem = imagem_da_pagina(pdf, page["pagina"], cfg["ocr"]["dpi"])
+    if imagem is None:
+        return []
+    return extrair_registros(imagem, categories)
+
+
 def _persist_record(
     session: Session,
     doc: Documento,
     pdf: Path,
     page: dict,
-    raw: str,
+    registro: dict,
     cfg: dict,
     categories: dict,
     rows: list[dict],
@@ -217,8 +234,10 @@ def _persist_record(
     Uma falha de integridade afeta apenas este registro: ela é anotada em
     ``erros_processamento`` e o processamento segue para o próximo.
     """
-    fields = extract_fields(raw)
-    classification, reasons, normalized = validate_record(fields, categories)
+    fields = registro["campos"]
+    ilegiveis = registro["ilegiveis"]
+    raw = registro["texto"]
+    classification, reasons, normalized = validate_record(fields, categories, ilegiveis)
     lido = normalized.get("protocolo") or ""
     # A entrega usava `lido or fallback`: como "PROTOCOLO?" é verdadeiro em
     # contexto booleano, o fallback nunca disparava e dois registros ilegíveis

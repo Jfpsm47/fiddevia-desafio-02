@@ -92,7 +92,11 @@ def normalize_category(value: str, categories: dict) -> str | None:
     return None
 
 
-def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dict]:
+def validate_record(
+    record: dict,
+    categories: dict,
+    campos_ilegiveis: frozenset[str] | set[str] = frozenset(),
+) -> tuple[str, list[str], dict]:
     """Valida, normaliza e classifica um registro.
 
     Cada campo produz, no máximo, um motivo: ``*_ausente`` quando não há valor e
@@ -100,9 +104,14 @@ def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dic
     precedência **inválido acima de incompleto** — um registro com um campo
     errado é inválido mesmo que outro campo esteja faltando (BUG-005).
 
+    Campos que o OCR não conseguiu ler recebem o motivo ``*_ilegivel`` e contam
+    como ausência, não como invalidez: dizer que o dado está errado quando o
+    problema foi a leitura falsearia o indicador de qualidade.
+
     Args:
         record: campos brutos, como devolvidos por :func:`extract_fields`.
         categories: conteúdo de ``categorias.json``.
+        campos_ilegiveis: campos que a digitalização não permitiu recuperar.
 
     Returns:
         A classificação (``valido``, ``incompleto`` ou ``invalido``), a lista de
@@ -111,18 +120,22 @@ def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dic
     r = dict(record)
     ausentes: list[str] = []
     invalidos: list[str] = []
+    ilegiveis = set(campos_ilegiveis)
+
+    def registrar_ausencia(campo: str, sufixo: str) -> None:
+        ausentes.append(f"{campo}_ilegivel" if campo in ilegiveis else f"{campo}_{sufixo}")
 
     protocolo = (r.get("protocolo") or "").strip().upper()
     r["protocolo"] = protocolo
     if is_missing(protocolo):
-        ausentes.append("protocolo_ausente")
+        registrar_ausencia("protocolo", "ausente")
     elif not PROTO_RE.fullmatch(protocolo):
         invalidos.append("protocolo_invalido")
 
     data_bruta = r.get("data", "")
     if is_missing(data_bruta):
         r["data_obj"] = None
-        ausentes.append("data_ausente")
+        registrar_ausencia("data", "ausente")
     else:
         r["data_obj"] = parse_date(data_bruta.strip())
         if not r["data_obj"]:
@@ -130,21 +143,21 @@ def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dic
 
     email = (r.get("email") or "").strip()
     if is_missing(email):
-        ausentes.append("email_ausente")
+        registrar_ausencia("email", "ausente")
     elif not EMAIL_RE.fullmatch(email):
         invalidos.append("email_invalido")
 
     cep = (r.get("cep") or "").strip()
     r["cep"] = cep
     if is_missing(cep):
-        ausentes.append("cep_ausente")
+        registrar_ausencia("cep", "ausente")
     elif not CEP_RE.fullmatch(cep):
         invalidos.append("cep_invalido")
 
     categoria = r.get("categoria", "")
     if is_missing(categoria):
         r["categoria_normalizada"] = None
-        ausentes.append("categoria_ausente")
+        registrar_ausencia("categoria", "ausente")
     else:
         r["categoria_normalizada"] = normalize_category(categoria, categories)
         if not r["categoria_normalizada"]:
@@ -153,7 +166,7 @@ def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dic
     tempo = r.get("tempo_minutos", "")
     if is_missing(tempo):
         r["tempo_obj"] = None
-        ausentes.append("tempo_ausente")
+        registrar_ausencia("tempo", "ausente")
     else:
         try:
             valor = float(str(tempo).strip())
@@ -166,7 +179,7 @@ def validate_record(record: dict, categories: dict) -> tuple[str, list[str], dic
 
     for campo in CAMPOS_OBRIGATORIOS:
         if is_missing(r.get(campo)):
-            ausentes.append(f"{campo}_ausente")
+            registrar_ausencia(campo, "ausente")
 
     reasons = invalidos + ausentes
     if invalidos:

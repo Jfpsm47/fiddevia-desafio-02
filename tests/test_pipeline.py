@@ -16,6 +16,7 @@ pytest.importorskip("pandas")
 
 from src.database import create_session_factory, session_scope  # noqa: E402
 from src.models import Atendimento, Documento, ErroProcessamento  # noqa: E402
+from src.validation import extract_fields  # noqa: E402
 from src.pipeline import (  # noqa: E402
     _metodo_do_documento,
     _persist_record,
@@ -64,7 +65,9 @@ def test_falha_de_integridade_isola_apenas_o_registro(monkeypatch):
         for protocolo in ("AT-901", "AT-902", "AT-903"):
             _persist_record(
                 sessao, doc, Path("t.pdf"), pagina,
-                registro(protocolo), CFG_CHUNK, CATEGORIAS, linhas,
+                {"campos": extract_fields(registro(protocolo)), "ilegiveis": set(),
+                 "texto": registro(protocolo)},
+                CFG_CHUNK, CATEGORIAS, linhas,
             )
 
     with session_scope(factory) as sessao:
@@ -186,7 +189,9 @@ def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
         for numero, sufixo in ((1, "um"), (2, "dois")):
             _persist_record(
                 sessao, doc, Path("t.pdf"), {"pagina": numero, "texto": "", "metodo": "extracao_direta"},
-                registro_sem_protocolo(sufixo), CFG_CHUNK, CATEGORIAS, linhas,
+                {"campos": extract_fields(registro_sem_protocolo(sufixo)), "ilegiveis": set(),
+                 "texto": registro_sem_protocolo(sufixo)},
+                CFG_CHUNK, CATEGORIAS, linhas,
             )
 
     assert [linha["classificacao"] for linha in linhas] == ["invalido", "invalido"]
