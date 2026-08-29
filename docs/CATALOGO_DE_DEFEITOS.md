@@ -8,13 +8,14 @@
 
 **Total: 34 defeitos** — 3 P0, 13 P1, 15 P2, 3 P3.
 
-**Situação em 29/08/2026, após a Onda 3:** 20 corrigidos, 1 em correção (BUG-031), 13 abertos.
+**Situação em 29/08/2026, após a Onda 4: os 34 defeitos estão corrigidos.**
 
 | Onda | Defeitos fechados |
 |---|---|
 | 1 — Destravar | BUG-001, BUG-003, BUG-010, BUG-011, BUG-029 |
 | 2 — Recuperar os dados | BUG-002, BUG-004, BUG-005, BUG-006, BUG-022, BUG-032, e BUG-020 antecipado da Onda 4 |
 | 3 — Completar os indicadores | BUG-007, BUG-008, BUG-009, BUG-014, BUG-016, BUG-017, BUG-018, BUG-025 |
+| 4 — Endurecer a entrega | BUG-012, BUG-013, BUG-015, BUG-019, BUG-021, BUG-023, BUG-024, BUG-026, BUG-027, BUG-028, BUG-030, BUG-031, BUG-033, BUG-034 |
 
 **Decisão de projeto registrada na Onda 2.** Campo que o OCR não recupera conta como **ausência** (motivo `*_ilegivel`), não como invalidez. Os 25 registros digitalizados entram como incompletos: o e-mail e o nome do solicitante não estão legíveis na imagem de 150 DPI, e nenhuma configuração de OCR testada os recupera. Nada é reconstruído por inferência.
 
@@ -461,7 +462,7 @@ E   ModuleNotFoundError: No module named 'sqlalchemy'
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/api.py:26-27` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 4, commit d315e01 |
 
 **Descrição.** `except Exception` converte toda falha no mesmo `503 "Consulta indisponível: {tipo}"`, e a exceção original é descartada **sem ser registrada em log**.
 
@@ -490,7 +491,7 @@ Dependência ausente, coleção não indexada e falha de rede produzem resposta 
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | `src/indexer.py:21-26`; `src/api.py:24` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 4, commit d315e01 |
 
 **Descrição.** `semantic_query` instancia `EmbeddingService` — que constrói um `SentenceTransformer` — e abre um `PersistentClient` do ChromaDB **a cada chamada** de `/ask`.
 
@@ -549,7 +550,7 @@ Registros encontrados: 0
 |---|---|
 | **Prioridade** | P1 |
 | **Local** | todo `src/` |
-| **Status** | Aberto |
+| **Status** | Corrigido — Onda 4, commit ae7814c |
 
 **Descrição.** Medições por AST sobre `src/`:
 
@@ -646,7 +647,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-019"></a>
 ## BUG-019 — Caminho de `categorias.json` fixo no código e arquivo duplicado
 
-**Prioridade** P2 · **Local** `src/pipeline.py:29`, `config.json`, `data/` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:29`, `config.json`, `data/` · **Status** Corrigido — Onda 4, commit ae7814c
 
 **Descrição.** O caminho `data/auxiliares/categorias.json` está embutido em `pipeline.py`, fora do `config.json`, contrariando o RF01 (*"ler caminhos e parâmetros de config.json"*). O diretório `data/auxiliares/` também não consta da estrutura do enunciado, que prevê `data/categorias.json`. Além disso o arquivo está duplicado, byte a byte, em `data/auxiliares_categorias.json`, e `config.json` está duplicado em `data/auxiliares/config_original.json`.
 
@@ -674,7 +675,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-021"></a>
 ## BUG-021 — O log de entrega contém caminhos absolutos da máquina
 
-**Prioridade** P2 · **Local** `src/pipeline.py:48` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:48` · **Status** Corrigido — Onda 4, commit ae7814c
 
 **Descrição.** `logging.exception` grava o rastreamento completo, com caminhos absolutos da máquina do desenvolvedor, no `output/processamento.log` — que é um artefato de entrega. São cerca de 120 linhas de rastreamento para as sete falhas de OCR, todas com a mesma causa.
 
@@ -704,7 +705,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-023"></a>
 ## BUG-023 — `split_chunks` degenera com sobreposição alta
 
-**Prioridade** P2 · **Local** `src/text_processor.py:22-34` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/text_processor.py:22-34` · **Status** Corrigido — Onda 4, commit ae7814c
 
 **Descrição.** A validação aceita `overlap` até `size-1`. Com `overlap > size/2`, o avanço por iteração degenera: medido, `size=100, overlap=90` produz **189 chunks para 1.600 caracteres** — avanço de cerca de 8 caracteres por iteração.
 
@@ -719,7 +720,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-024"></a>
 ## BUG-024 — Dependências não usadas e versões não fixadas
 
-**Prioridade** P2 · **Local** `requirements.txt` · **Status** Aberto
+**Prioridade** P2 · **Local** `requirements.txt` · **Status** Corrigido — Onda 4, commit ae7814c
 
 **Descrição.** `nltk` e `pdfplumber` são declarados e **nunca importados** em `src/` ou `tests/`. Nenhuma das 21 dependências tem versão fixada — todas usam `>=`.
 
@@ -747,7 +748,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-026"></a>
 ## BUG-026 — `--pergunta` reprocessa os quatro PDFs antes de responder
 
-**Prioridade** P2 · **Local** `src/main.py:13-16` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/main.py:13-16` · **Status** Corrigido — Onda 4, commit d315e01
 
 **Descrição.** `main()` chama `process_all(cfg)` incondicionalmente, antes de tratar `--pergunta`. Consultar exige atravessar o pipeline inteiro.
 
@@ -762,7 +763,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-027"></a>
 ## BUG-027 — URL da API fixa no código do Streamlit
 
-**Prioridade** P2 · **Local** `src/app_streamlit.py:11` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/app_streamlit.py:11` · **Status** Corrigido — Onda 4, commit d315e01
 
 **Descrição.** `http://127.0.0.1:8000` está embutido na chamada `requests.post`. Mudar porta ou host exige editar o fonte.
 
@@ -777,7 +778,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-031"></a>
 ## BUG-031 — A entrega não é um repositório Git
 
-**Prioridade** P2 · **Local** raiz do projeto · **Status** Em correção — repositório, branch e commits feitos; tag v1.0.0 ao final das ondas
+**Prioridade** P2 · **Local** raiz do projeto · **Status** Corrigido — Onda 4, repositório com 4 ondas integradas e tag v1.0.0
 
 **Descrição.** Existe `.gitignore`, mas não existe `.git`, nem commits, nem branch de desenvolvimento, nem merge, nem a tag `v1.0.0`. O README reconhece a limitação e a atribui ao formato de entrega em ZIP.
 
@@ -792,7 +793,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-033"></a>
 ## BUG-033 — O RAG cita registros inválidos como fonte, sem marcação
 
-**Prioridade** P2 · **Local** `src/pipeline.py:60` (metadados do chunk), `src/indexer.py:26` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/pipeline.py:60` (metadados do chunk), `src/indexer.py:26` · **Status** Corrigido — Onda 4, commit d315e01
 
 **Descrição.** A recuperação semântica devolve como fonte registros classificados como inválidos, sem nenhuma indicação. Verificado: consulta *"Como resolver erro de pip nao reconhecido?"* devolveu `AT-084` (inválido, `sim=0.5052`) entre as três primeiras fontes.
 
@@ -809,7 +810,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-034"></a>
 ## BUG-034 — O modo local nunca responde a partir do contexto
 
-**Prioridade** P2 · **Local** `src/rag.py:7-8` · **Status** Aberto
+**Prioridade** P2 · **Local** `src/rag.py:7-8` · **Status** Corrigido — Onda 4, commit d315e01
 
 **Descrição.** Sem `OPENAI_API_KEY`, o campo `resposta` traz sempre o mesmo texto fixo — *"Modo local: foram recuperados os trechos mais semelhantes. Configure OPENAI_API_KEY para gerar uma síntese."* — independentemente do que foi recuperado.
 
@@ -826,7 +827,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-028"></a>
 ## BUG-028 — `datetime.utcnow` depreciado
 
-**Prioridade** P3 · **Local** `src/models.py:17` e `:64` · **Status** Aberto
+**Prioridade** P3 · **Local** `src/models.py:17` e `:64` · **Status** Corrigido — Onda 4, commit ae7814c
 
 **Descrição.** `datetime.utcnow` está depreciado no Python 3.12+ e emite `DeprecationWarning`. Dois usos, ambos como `default` de coluna.
 
@@ -854,7 +855,7 @@ Os padrões `E-mail\s+(\S+)` e `Tempo\s+(-?\d+)?\s*min` não casam com esse text
 <a id="bug-030"></a>
 ## BUG-030 — Suíte de testes insuficiente e arquivo previsto ausente
 
-**Prioridade** P3 · **Local** `tests/` · **Status** Aberto
+**Prioridade** P3 · **Local** `tests/` · **Status** Corrigido — Onda 4, testes de 5 para 172
 
 **Descrição.** 5 testes para 15 módulos. `tests/test_pdf_processor.py`, previsto na estrutura do enunciado, não existe. Sem cobertura: `pipeline`, `analytics`, `cep_client`, `embeddings`, `vector_store`, `indexer`, `rag`, `ocr_processor`, `pdf_processor`, `database`, `models`, `config`.
 

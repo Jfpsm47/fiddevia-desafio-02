@@ -22,7 +22,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["D100", "D103"]  # os testes se explicam pelo nome
+# Os testes se explicam pelo nome; classes auxiliares neles são de apoio.
+"tests/*" = ["D100", "D101", "D102", "D103", "D107"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
