@@ -197,3 +197,39 @@ def test_email_ilegivel_nunca_e_inventado():
     for registro in registros:
         assert registro["campos"]["email"] == ""
         assert "email" in registro["ilegiveis"]
+
+
+# --- município e UF (BUG-007) ---
+
+@pytest.mark.parametrize(
+    "lido,municipio,uf",
+    [
+        ("Sinop/MT", "Sinop", "MT"),
+        ("Lucas do Rio Verde/MT", "Lucas do Rio Verde", "MT"),
+        ("CaceresM T", "Caceres", "MT"),
+        ("Varzea G randeM T", "Varzea G rande", "MT"),
+        ("-CuiBbaM T", "CuiBba", "MT"),
+        ("", "", ""),
+    ],
+)
+def test_separar_municipio_uf(lido, municipio, uf):
+    from src.ocr_table import separar_municipio_uf
+
+    assert separar_municipio_uf(lido) == (municipio, uf)
+
+
+@pytest.mark.parametrize(
+    "lido,plausivel",
+    [
+        ("Caceres", True),
+        ("Rondonopols", True),
+        ("Lucas do Rio Verde", True),
+        ("Varzea G rande", False),
+        ("CuiBba", False),
+        ("Sin", False),
+    ],
+)
+def test_municipio_plausivel(lido, plausivel):
+    from src.ocr_table import municipio_plausivel
+
+    assert municipio_plausivel(lido) is plausivel

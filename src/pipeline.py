@@ -14,14 +14,15 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from .analytics import export_results, generate_charts
+from .cep_client import lookup_cep
 from .config import resolve, resolve_sqlite_url
 from .database import create_session_factory, find_by_protocol, session_scope
 from .models import Atendimento, Chunk, Documento, ErroProcessamento
 from .ocr_processor import imagem_da_pagina, verificar_ocr
-from .ocr_table import extrair_registros
+from .ocr_table import extrair_registros, semelhante, separar_municipio_uf
 from .pdf_processor import extract_pdf_pages
 from .text_processor import metadata_json, preprocess, split_chunks
-from .validation import PROTO_RE, clean_text, extract_fields, validate_record
+from .validation import PROTO_RE, clean_text, extract_fields, normalize_key, validate_record
 
 
 def console_utf8(stream):
@@ -87,11 +88,13 @@ def process_all(cfg: dict) -> pd.DataFrame:
     logging.info("OCR: %s", ocr_msg) if ocr_ok else logging.warning("OCR indisponível — %s", ocr_msg)
 
     rows: list[dict] = []
+    cache_cep: dict[str, tuple[str | None, str | None]] = {}
+    vocabulario_municipios: dict[str, str] = {}
     for pdf in sorted(pdf_dir.glob(cfg["entrada"]["padrao"])):
         marca = len(rows)
         try:
             with session_scope(factory) as session:
-                _process_document(session, pdf, cfg, categories, rows)
+                _process_document(session, pdf, cfg, categories, rows, cache_cep, vocabulario_municipios)
         except Exception as exc:
             # A transação do documento foi revertida: descarta também as linhas
             # que ele havia acrescentado, para que CSV e banco não divirjam.
@@ -145,6 +148,8 @@ def _process_document(
     cfg: dict,
     categories: dict,
     rows: list[dict],
+    cache_cep: dict,
+    vocabulario_municipios: dict,
 ) -> None:
     """Extrai, valida e persiste todos os registros de um documento."""
     digest = sha256(pdf.read_bytes()).hexdigest()
@@ -185,7 +190,10 @@ def _process_document(
                 for raw in split_records(page["texto"])
             ]
         for registro in extraidos:
-            _persist_record(session, doc, pdf, page, registro, cfg, categories, rows)
+            _persist_record(
+                session, doc, pdf, page, registro, cfg, categories, rows,
+                cache_cep, vocabulario_municipios,
+            )
 
     # O método do documento reflete o que de fato aconteceu, não a intenção
     # avaliada antes de processar (BUG-022).
@@ -202,6 +210,63 @@ def _metodo_do_documento(page_data: list[dict]) -> str:
     if len(processados) == 1 and not metodos & {"ocr_pendente"}:
         return processados.pop()
     return "misto"
+
+
+#: Abaixo desta semelhança um município lido por OCR não é associado a nenhum
+#: nome conhecido, e passa a ser tratado como ilegível.
+CORTE_MUNICIPIO = 0.8
+
+
+def _registrar_municipio(vocabulario: dict, nome: str | None, autoritativo: bool = False) -> None:
+    """Guarda a grafia de um município, preferindo sempre a fonte autoritativa."""
+    if not nome:
+        return
+    chave = normalize_key(nome)
+    if autoritativo or chave not in vocabulario:
+        vocabulario[chave] = nome
+
+
+def _canonizar_municipio(vocabulario: dict, nome: str | None, aproximar: bool) -> str | None:
+    """Reduz as grafias de um mesmo município a uma só.
+
+    Sem isso, "Cáceres" vindo do ViaCEP e "Caceres" vindo do documento contam
+    como cidades diferentes e o indicador por município fica errado.
+
+    Args:
+        vocabulario: grafias já conhecidas, por chave sem acento.
+        nome: valor lido.
+        aproximar: em texto de OCR, admite associar uma grafia degradada
+            ("Snop", "Rondonopols") ao nome conhecido mais próximo. Sem
+            correspondência, devolve ``None`` — o valor é ilegível, não um
+            palpite.
+    """
+    if not nome:
+        return None
+    chave = normalize_key(nome)
+    if chave in vocabulario:
+        return vocabulario[chave]
+    if aproximar:
+        return semelhante(nome, list(vocabulario.values()), corte=CORTE_MUNICIPIO)
+    return nome
+
+
+def _localidade(cep: str, cfg: dict, cache: dict) -> tuple[str | None, str | None]:
+    """Consulta o ViaCEP uma vez por CEP distinto e guarda o resultado.
+
+    Os documentos repetem cerca de nove CEPs em cem registros: sem o cache
+    seriam cem requisições para nove respostas. Uma falha de rede, um CEP
+    inexistente ou a consulta desligada em ``api.enriquecer_cep`` devolvem
+    ``(None, None)`` e nunca interrompem o pipeline (RF07).
+    """
+    api = cfg.get("api") or {}
+    base_url = api.get("cep_base_url")
+    if not cep or not base_url or not api.get("enriquecer_cep", True):
+        return None, None
+    if cep in cache:
+        return cache[cep]
+    dados = lookup_cep(cep, base_url, api.get("timeout_segundos", 8))
+    cache[cep] = (dados["municipio"], dados["uf"]) if dados else (None, None)
+    return cache[cep]
 
 
 def _registros_por_ocr(pdf: Path, page: dict, cfg: dict, categories: dict) -> list[dict]:
@@ -228,6 +293,8 @@ def _persist_record(
     cfg: dict,
     categories: dict,
     rows: list[dict],
+    cache_cep: dict,
+    vocabulario_municipios: dict,
 ) -> None:
     """Valida um registro e o persiste dentro de um ``SAVEPOINT`` próprio.
 
@@ -250,10 +317,32 @@ def _persist_record(
         classification = "duplicado"
         reasons.append("protocolo_duplicado")
 
+    # Município e UF vêm do próprio documento; o ViaCEP tem a palavra final
+    # quando o CEP resolve, por ser a fonte autoritativa (RF07).
+    municipio, uf = separar_municipio_uf(fields.get("municipio_uf", "")) if fields.get("municipio_uf") else (
+        fields.get("municipio", ""), fields.get("uf", "")
+    )
+    if "municipio" in ilegiveis:
+        municipio = ""
+    oficial_municipio, oficial_uf = _localidade(normalized.get("cep", ""), cfg, cache_cep)
+    _registrar_municipio(vocabulario_municipios, oficial_municipio, autoritativo=True)
+    if oficial_municipio:
+        municipio = oficial_municipio
+    else:
+        municipio = _canonizar_municipio(
+            vocabulario_municipios, municipio, aproximar=page["metodo"] == "ocr"
+        )
+        _registrar_municipio(vocabulario_municipios, municipio if page["metodo"] != "ocr" else None)
+    if not municipio and page["metodo"] == "ocr":
+        reasons.append("municipio_ilegivel")
+    uf = (oficial_uf or uf or "").upper()[:2] or None
+
     row = {
         **fields,
         "protocolo": protocol,
         "protocolo_bruto": lido,
+        "municipio": municipio,
+        "uf": uf,
         "categoria": normalized.get("categoria_normalizada") or fields.get("categoria"),
         "data": normalized.get("data_obj"),
         "tempo_minutos": normalized.get("tempo_obj"),
@@ -292,8 +381,9 @@ def _persist_record(
                 tempo_minutos=normalized.get("tempo_obj"),
                 status=fields.get("status"),
                 cep=fields.get("cep"),
-                municipio=None,
-                uf=None,
+                municipio=municipio,
+                uf=uf,
+                observacoes=fields.get("observacoes"),
                 classificacao=classification,
                 motivos=row["motivos"],
                 texto_original=raw,

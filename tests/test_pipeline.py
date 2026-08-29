@@ -67,7 +67,7 @@ def test_falha_de_integridade_isola_apenas_o_registro(monkeypatch):
                 sessao, doc, Path("t.pdf"), pagina,
                 {"campos": extract_fields(registro(protocolo)), "ilegiveis": set(),
                  "texto": registro(protocolo)},
-                CFG_CHUNK, CATEGORIAS, linhas,
+                CFG_CHUNK, CATEGORIAS, linhas, {}, {},
             )
 
     with session_scope(factory) as sessao:
@@ -104,6 +104,9 @@ def test_documento_corrompido_nao_derruba_os_demais(tmp_path):
         "banco": {"url": f"sqlite:///{banco.as_posix()}"},
         "ocr": {"idioma": "por", "dpi": 300, "min_caracteres_extracao_direta": 40},
         "embeddings": {"tamanho_chunk": 500, "sobreposicao": 80},
+        # sem rede: a suíte não pode depender do ViaCEP
+        "api": {"cep_base_url": "https://viacep.com.br/ws", "timeout_segundos": 8,
+                "enriquecer_cep": False},
     }
 
     df = process_all(cfg)
@@ -152,6 +155,9 @@ def test_linhas_do_documento_revertido_saem_do_relatorio(tmp_path, monkeypatch):
         "banco": {"url": f"sqlite:///{(tmp_path / 'database' / 'a.db').as_posix()}"},
         "ocr": {"idioma": "por", "dpi": 300, "min_caracteres_extracao_direta": 40},
         "embeddings": {"tamanho_chunk": 500, "sobreposicao": 80},
+        # sem rede: a suíte não pode depender do ViaCEP
+        "api": {"cep_base_url": "https://viacep.com.br/ws", "timeout_segundos": 8,
+                "enriquecer_cep": False},
     }
 
     df = process_all(cfg)
@@ -191,7 +197,7 @@ def test_protocolos_ilegiveis_nao_viram_falsa_duplicata():
                 sessao, doc, Path("t.pdf"), {"pagina": numero, "texto": "", "metodo": "extracao_direta"},
                 {"campos": extract_fields(registro_sem_protocolo(sufixo)), "ilegiveis": set(),
                  "texto": registro_sem_protocolo(sufixo)},
-                CFG_CHUNK, CATEGORIAS, linhas,
+                CFG_CHUNK, CATEGORIAS, linhas, {}, {},
             )
 
     assert [linha["classificacao"] for linha in linhas] == ["invalido", "invalido"]
@@ -217,3 +223,55 @@ def test_metodo_do_documento_reflete_o_resultado(metodos, esperado):
     inteiro ficava gravado como "ocr" (BUG-022)."""
     paginas = [{"metodo": m} for m in metodos]
     assert _metodo_do_documento(paginas) == esperado
+
+
+# --- canonização de município (BUG-007) ---
+
+def test_grafias_do_mesmo_municipio_contam_como_uma():
+    """"Cáceres" do ViaCEP e "Caceres" do documento eram cidades diferentes
+    no indicador por município."""
+    from src.pipeline import _canonizar_municipio, _registrar_municipio
+
+    vocabulario: dict[str, str] = {}
+    _registrar_municipio(vocabulario, "Caceres")
+    _registrar_municipio(vocabulario, "Cáceres", autoritativo=True)
+
+    assert _canonizar_municipio(vocabulario, "Caceres", aproximar=False) == "Cáceres"
+    assert _canonizar_municipio(vocabulario, "CACERES", aproximar=False) == "Cáceres"
+
+
+def test_fonte_autoritativa_tem_precedencia_sobre_o_documento():
+    from src.pipeline import _canonizar_municipio, _registrar_municipio
+
+    vocabulario: dict[str, str] = {}
+    _registrar_municipio(vocabulario, "Cuiabá", autoritativo=True)
+    _registrar_municipio(vocabulario, "Cuiaba")
+
+    assert _canonizar_municipio(vocabulario, "Cuiaba", aproximar=False) == "Cuiabá"
+
+
+def test_grafia_degradada_por_ocr_encontra_o_municipio_conhecido():
+    from src.pipeline import _canonizar_municipio, _registrar_municipio
+
+    vocabulario: dict[str, str] = {}
+    for nome in ("Sinop", "Rondonopolis", "Varzea Grande"):
+        _registrar_municipio(vocabulario, nome)
+
+    assert _canonizar_municipio(vocabulario, "Snop", aproximar=True) == "Sinop"
+    assert _canonizar_municipio(vocabulario, "Rondonopols", aproximar=True) == "Rondonopolis"
+
+
+def test_grafia_irreconhecivel_nao_recebe_palpite():
+    from src.pipeline import _canonizar_municipio, _registrar_municipio
+
+    vocabulario: dict[str, str] = {}
+    _registrar_municipio(vocabulario, "Sinop")
+
+    assert _canonizar_municipio(vocabulario, "Xyzabc", aproximar=True) is None
+
+
+def test_texto_direto_nao_e_aproximado():
+    """Só leitura de OCR admite aproximação; texto selecionável vai como está."""
+    from src.pipeline import _canonizar_municipio
+
+    assert _canonizar_municipio({}, "Cidade Nova", aproximar=False) == "Cidade Nova"

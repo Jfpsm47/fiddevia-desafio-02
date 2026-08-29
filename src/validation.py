@@ -17,6 +17,7 @@ FIELD_PATTERNS = {
     "categoria": r"Categoria\s+(.+?)\s+Status",
     "status": r"Status\s+(Concluido|Pendente|Em atendimento)",
     "cep": r"CEP\s*/?\s*cidade\s+(\S+)",
+    "municipio_uf": r"CEP\s*/?\s*cidade\s+\S+\s*-\s*(.+?)\s+Tempo",
     "tempo_minutos": r"Tempo\s+(-?\d+)?\s*min",
     "descricao": r"Problema\s+(.+?)\s+Solucao",
     "solucao": r"Solucao\s+(.+?)\s+Observacoes",

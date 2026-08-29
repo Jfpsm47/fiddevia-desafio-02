@@ -30,7 +30,8 @@
   },
   "api": {
     "cep_base_url": "https://viacep.com.br/ws",
-    "timeout_segundos": 8
+    "timeout_segundos": 8,
+    "enriquecer_cep": true
   },
   "rag": {
     "top_k": 5,

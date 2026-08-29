@@ -30,6 +30,7 @@ class Atendimento(Base):
     categoria: Mapped[str | None] = mapped_column(String(100), nullable=True)
     descricao: Mapped[str | None] = mapped_column(Text, nullable=True)
     solucao: Mapped[str | None] = mapped_column(Text, nullable=True)
+    observacoes: Mapped[str | None] = mapped_column(Text, nullable=True)
     tempo_minutos: Mapped[float | None] = mapped_column(Float, nullable=True)
     status: Mapped[str | None] = mapped_column(String(40), nullable=True)
     cep: Mapped[str | None] = mapped_column(String(10), nullable=True)
