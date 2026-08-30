@@ -4,7 +4,14 @@ Processa documentos de atendimento em PDF — digitais e digitalizados —, extr
 padroniza os dados, persiste o histórico, produz indicadores e responde a
 perguntas em linguagem natural sobre os atendimentos.
 
-**Desafio 2 — Introdução a Python para IA · FIC_DEV, Programador de Sistemas com IA**
+**Desafio 2 — Introdução a Python para IA · FIC_DEV, Programador de Sistemas com IA**  
+**Módulo:** COD 001 - Introdução a Python para IA  
+**Modalidade:** Equipe de 03 discentes  
+
+### Equipe / Discentes
+- Gabriel André de Siqueira Nonato
+- João Flávio Pompeo
+- Kristiann Marcellus Rocha Júnior
 
 Esta é uma solução recebida pronta e submetida a auditoria. A documentação completa do projeto compreende:
 
