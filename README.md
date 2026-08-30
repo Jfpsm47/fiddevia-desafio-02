@@ -13,13 +13,15 @@ perguntas em linguagem natural sobre os atendimentos.
 - João Flávio Pompeo
 - Kristiann Marcellus Rocha Júnior
 
+**Vídeo do Pitch (5 min):** [https://youtu.be/qFrxCdb9Lp0](https://youtu.be/qFrxCdb9Lp0)
+
 Esta é uma solução recebida pronta e submetida a auditoria. A documentação completa do projeto compreende:
 
 - **Diagnóstico Inicial:** [`docs/RELATORIO_DIAGNOSTICO_INICIAL.md`](docs/RELATORIO_DIAGNOSTICO_INICIAL.md)
 - **Catálogo de 34 Defeitos Corrigidos:** [`docs/CATALOGO_DE_DEFEITOS.md`](docs/CATALOGO_DE_DEFEITOS.md)
 - **Documentação Técnica e Diagramas:** [`docs/ARQUITETURA_E_DIAGRAMAS.md`](docs/ARQUITETURA_E_DIAGRAMAS.md)
 - **Crítica e Plano de Melhorias (P0 a P3):** [`docs/CRITICA_E_PLANO_DE_MELHORIAS.md`](docs/CRITICA_E_PLANO_DE_MELHORIAS.md)
-- **Apoio Visual e Roteiro do Pitch (5 min):** [`docs/PITCH_E_SLIDES.md`](docs/PITCH_E_SLIDES.md)
+- **Apoio Visual (5 min):**· [Assistir ao Vídeo](https://youtu.be/qFrxCdb9Lp0)
 
 ---
 

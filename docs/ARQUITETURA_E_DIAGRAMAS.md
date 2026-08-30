@@ -10,6 +10,16 @@
 
 A aplicação foi projetada seguindo uma arquitetura modular em camadas, desacoplando o pipeline de ingestão e processamento de dados da camada de persistência, indexação vetorial e serviços de consulta (API HTTP e Interface Web).
 
+### Diagramas Visuais do Sistema
+
+#### Pipeline de Processamento (CLI) e Consulta / RAG
+![Pipeline de Processamento e Consulta](diagramas/diagrama_pipeline.jpg)
+
+#### Fluxograma de Execução e Módulos
+![Fluxo de Execução e Módulos](diagramas/diagrama_fluxo.jpg)
+
+---
+
 ```mermaid
 graph TB
     subgraph INGESTÃO ["1. Camada de Ingestão & Extração"]
